@@ -22,6 +22,8 @@ npx skills add zytakeshi/admin-skills
 
 ```bash
 npx skills add zytakeshi/admin-skills@deploy
+npx skills add zytakeshi/admin-skills@commit-push
+npx skills add zytakeshi/admin-skills@create-pr
 ```
 
 ## 利用可能なスキル

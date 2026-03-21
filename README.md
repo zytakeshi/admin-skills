@@ -22,6 +22,8 @@ Or install a specific skill:
 
 ```bash
 npx skills add zytakeshi/admin-skills@deploy
+npx skills add zytakeshi/admin-skills@commit-push
+npx skills add zytakeshi/admin-skills@create-pr
 ```
 
 ## Available Skills
