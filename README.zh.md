@@ -10,7 +10,9 @@
 
 - **`/deploy`** — 零停机部署，强制备份、差异检测、自动清理缓存。再也不会忘记回滚方案。
 - **`/commit-push`** — 分析 diff，生成规范的 commit message，安全推送。告别 "fix stuff" 提交。
-- **`/create-pr`** — 创建 PR 后自动由 [OpenAI Codex](https://chatgpt.com/codex) 审查。Codex 审查使用 ChatGPT 订阅的**独立配额**，不消耗正常的 Codex 任务额度。每个 PR 都能获得免费的高质量 AI 代码审查。审查完成后，Claude 自动读取反馈、修复认可的问题、推送修复，然后询问你是否合并 — 全流程端到端自动化。
+- **`/create-pr`** — 创建 PR 后自动由 [OpenAI Codex](https://chatgpt.com/codex) 审查。审查完成后，Claude 自动读取反馈、修复认可的问题、推送修复，然后询问你是否合并 — 全流程端到端自动化。
+
+> **注意（2026年3月31日起）：** Codex 代码审查现已计入常规 Codex 使用额度，不再享有独立配额。频繁使用代码审查可能会更快达到 Codex 整体限额。详见 [OpenAI 公告](https://chatgpt.com/codex)。
 
 ## 安装
 

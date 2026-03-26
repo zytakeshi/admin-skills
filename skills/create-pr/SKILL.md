@@ -56,6 +56,8 @@ EOF
 
 ## Phase 3: Monitor for Codex Review
 
+> **Note (March 31, 2026):** Codex Code Review now counts toward regular Codex usage limits instead of having a separate allowance. Heavy usage may cause users to hit their overall Codex limit sooner.
+
 This is the critical automation step. After creating the PR, poll GitHub API for review activity from the Codex bot (`chatgpt-codex-connector[bot]`).
 
 ### How Codex reviews appear on GitHub
@@ -95,7 +97,7 @@ echo "Waiting for Codex to review commit $HEAD_SHA (pushed at $PUSH_TIME)"
 # Initial delay: Codex typically needs 2-5 minutes to process
 sleep 90
 
-for i in $(seq 1 38); do
+for i in $(seq 1 57); do
   # Check for a review from Codex bot that references this specific commit
   REVIEWED=$(gh api repos/{owner}/{repo}/pulls/{pr_number}/reviews \
     --jq "[.[] | select(.user.login == \"$CODEX_BOT\" and .state != \"PENDING\" and ((.body // \"\") | contains(\"$REVIEW_MARKER\")))] | length" \
@@ -107,7 +109,7 @@ for i in $(seq 1 38); do
     --jq "[.[] | select(.user.login == \"$CODEX_BOT\" and .content == \"+1\" and .created_at > \"$PUSH_TIME\")] | length" \
     2>/dev/null || echo "0")
 
-  echo "Poll $i/38: reviewed_head=$REVIEWED reaction_after_push=$REACTION_AFTER_PUSH"
+  echo "Poll $i/57: reviewed_head=$REVIEWED reaction_after_push=$REACTION_AFTER_PUSH"
 
   # Review with findings (commit-scoped via SHA in body)
   if [ "$REVIEWED" != "0" ]; then
@@ -131,7 +133,7 @@ for i in $(seq 1 38); do
     exit 0
   fi
 
-  sleep 30
+  [ "$i" -lt 57 ] && sleep 30
 done
 
 echo "CODEX_REVIEW_TIMEOUT"
