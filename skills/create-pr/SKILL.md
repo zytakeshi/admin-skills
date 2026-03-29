@@ -217,7 +217,7 @@ Tell the user:
 When the background task completes, read its output:
 
 - **`CODEX_REVIEW_FOUND`**: Parse the `---REVIEWS---` and `---COMMENTS---` sections. Proceed to Phase 4.
-- **`CODEX_REVIEW_CLEAN`**: Codex reviewed and found no issues. Tell the user: "Codex reviewed the PR and found no issues." Proceed to Phase 5 (ask to merge).
+- **`CODEX_REVIEW_CLEAN`**: Codex reviewed and found no issues. Tell the user: "Codex reviewed the PR and found no issues." Proceed to Phase 5.
 - **`CODEX_NOT_TRIGGERED`** (first attempt): Codex didn't pick up the PR. Automatically recreate:
   - `gh pr comment {pr_number} --body "Closing to re-trigger Codex review — eyes reaction not detected."`
   - `gh pr close {pr_number}`
@@ -233,7 +233,9 @@ When the background task completes, read its output:
   1. **Keep waiting** — user can re-invoke later
   2. **Merge as-is** — skip review, proceed to Phase 5
 
-## Phase 4: Verify and Fix Review Comments
+## Phase 4: Verify and Fix Review Comments (loop)
+
+This phase loops with Phase 3 until Codex is satisfied. Each iteration is called a **round** (round 1, round 2, …).
 
 When comments arrive:
 
@@ -246,17 +248,25 @@ When comments arrive:
    - Run the project's lint/analyze command to verify no regressions.
    - Stage only the changed files, create a NEW commit (never amend):
      ```
-     fix: address Codex review feedback
+     fix: address Codex review feedback (round N)
 
      <bullet list of what was fixed and why>
      ```
    - Push to the same branch.
+4. **Loop back to Phase 3** — re-capture the new HEAD SHA and re-enter the polling script to wait for Codex to review the new commit. Tell the user:
+   > "Fixes pushed (round N). Waiting for Codex to re-review…"
+5. When Phase 3 returns a result for the new commit:
+   - **`CODEX_REVIEW_FOUND`**: Start the next round — go to step 1 of this phase.
+   - **`CODEX_REVIEW_CLEAN`**: Codex is satisfied. Proceed to Phase 5.
+   - **`CODEX_REVIEW_TIMEOUT`**: Tell the user Codex timed out on re-review and offer options (keep waiting / merge as-is).
+
+**Safety cap**: After **5 rounds** of fixes without a clean review, stop looping and ask the user how to proceed (keep going, merge as-is, or abandon). This prevents unbounded iteration.
 
 ## Phase 5: Merge
 
-After pushing fixes:
+After Codex gives a clean review (or user elects to merge):
 
-1. Confirm with the user: "Review feedback addressed and pushed. Merge now?"
+1. Confirm with the user: "Codex is satisfied (or: user chose to merge). Merge now?"
 2. If user confirms (or if the original request included "and merge"):
    ```bash
    gh pr merge {pr_number} --squash
