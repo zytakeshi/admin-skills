@@ -275,6 +275,11 @@ After Codex gives a clean review (or user elects to merge):
    ```bash
    gh pr view {pr_number} --json state --jq '.state'
    ```
+4. Switch back to the base branch and pull:
+   ```bash
+   BASE_BRANCH=$(gh pr view {pr_number} --json baseRefName --jq '.baseRefName')
+   git checkout "$BASE_BRANCH" && git pull
+   ```
 
 ## Important Rules
 
