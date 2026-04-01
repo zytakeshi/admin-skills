@@ -240,11 +240,12 @@ This phase loops with Phase 3 until Codex is satisfied. Each iteration is called
 When comments arrive:
 
 1. Parse each comment — extract the file path, line range, and issue description.
-2. For each comment, assess whether you agree:
-   - **Agree**: Read the relevant code, implement the fix, and note what was changed.
-   - **Disagree**: Explain why to the user and skip (don't fix without user confirmation).
-   - **Partially agree**: Explain the nuance, propose an alternative, fix if the user approves.
-3. After all fixes:
+2. **Independently assess each comment** — read the relevant code and evaluate whether the suggestion is correct and improves the code. You are the gatekeeper; do NOT blindly fix everything Codex says. For each comment:
+   - **Agree** (the suggestion is valid and beneficial): Implement the fix and note what was changed.
+   - **Disagree** (the suggestion is incorrect, unnecessary, or would degrade the code): **Do NOT fix it.** Explain to the user why you disagree and skip the change.
+   - **Partially agree** (the concern is valid but the suggested fix isn't ideal): Explain the nuance to the user, propose a better alternative, and implement your alternative if appropriate.
+   - Present a summary table to the user: each comment, your verdict (agree/disagree/partial), and your reasoning.
+3. After all fixes (if any):
    - Run the project's lint/analyze command to verify no regressions.
    - Stage only the changed files, create a NEW commit (never amend):
      ```
