@@ -242,20 +242,30 @@ When comments arrive:
 1. Parse each comment — extract the file path, line range, and issue description.
 2. **Independently assess each comment** — read the relevant code and evaluate whether the suggestion is correct and improves the code. You are the gatekeeper; do NOT blindly fix everything Codex says. For each comment:
    - **Agree** (the suggestion is valid and beneficial): Implement the fix and note what was changed.
-   - **Disagree** (the suggestion is incorrect, unnecessary, or would degrade the code): **Do NOT fix it.** Explain to the user why you disagree and skip the change.
-   - **Partially agree** (the concern is valid but the suggested fix isn't ideal): Explain the nuance to the user, propose a better alternative, and implement your alternative if appropriate.
-   - Present a summary table to the user: each comment, your verdict (agree/disagree/partial), and your reasoning.
-3. After all fixes (if any):
-   - Run the project's lint/analyze command to verify no regressions.
-   - Stage only the changed files, create a NEW commit (never amend):
+   - **Disagree** (the suggestion is incorrect, unnecessary, or would degrade the code): **Do NOT fix it.** Instead, reply to the comment on the PR explaining why you disagree:
+     ```bash
+     gh api repos/{owner}/{repo}/pulls/{pr_number}/comments/{comment_id}/replies \
+       --method POST -f body="<your reasoning for disagreeing>"
+     ```
+     This lets Codex see your counterargument in the next review round and either accept it or push back.
+   - **Partially agree** (the concern is valid but the suggested fix isn't ideal): Reply to the comment explaining why you're taking a different approach, then implement your better alternative.
+3. After processing all comments (fixes + reply-comments):
+   - If any code was changed: run the project's lint/analyze command to verify no regressions, stage only the changed files, create a NEW commit (never amend):
      ```
      fix: address Codex review feedback (round N)
 
      <bullet list of what was fixed and why>
+     <bullet list of what was disputed with reasoning>
+     ```
+   - If no code was changed (all comments disputed): still push the reply comments so Codex can read them, then create a no-op commit with a message like:
+     ```
+     chore: respond to Codex review (round N) — no code changes
+
+     All findings disputed — see PR comment replies for reasoning.
      ```
    - Push to the same branch.
-4. **Loop back to Phase 3** — re-capture the new HEAD SHA and re-enter the polling script to wait for Codex to review the new commit. Tell the user:
-   > "Fixes pushed (round N). Waiting for Codex to re-review…"
+4. **Loop back to Phase 3** — re-capture the new HEAD SHA and re-enter the polling script to wait for Codex to review the new commit (and read your reply comments). Tell the user:
+   > "Round N complete. Waiting for Codex to re-review…"
 5. When Phase 3 returns a result for the new commit:
    - **`CODEX_REVIEW_FOUND`**: Start the next round — go to step 1 of this phase.
    - **`CODEX_REVIEW_CLEAN`**: Codex is satisfied. Proceed to Phase 5.
