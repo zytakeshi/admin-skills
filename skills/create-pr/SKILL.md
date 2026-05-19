@@ -3,7 +3,7 @@ name: create-pr
 description: |
   Create a PR from uncommitted changes, then monitor for Codex review comments, verify and fix issues, and merge.
   Triggers: "create pr", "create a pr", "make a pr", "open pr", "submit pr", "push and create pr", "pr for these changes"
-  This skill should be used proactively whenever the user asks to create a pull request. It handles the full lifecycle: commit, push, create PR, wait for Codex review, address feedback, and merge.
+  This skill should be used proactively whenever the user asks to create a pull request. It handles the full lifecycle: auto-bump version (if not already bumped), commit, push, create PR, wait for Codex review, address feedback, and merge.
 ---
 
 You are automating the full pull request lifecycle. Follow each phase in order.
@@ -25,7 +25,46 @@ $ARGUMENTS
    - Keep it concise (1-2 sentence summary line, optional bullet details)
    - Do NOT commit `.env`, credentials, or secrets — warn the user if found
 
-3. Stage specific files (not `git add -A`), commit, verify with `git status`.
+3. **Auto-bump the version (if not already bumped).** Every PR should carry a version bump unless one is already present in the changes. Detect → decide → bump:
+
+   a. **Locate the version file** at the repo root — first match wins:
+
+      | File | Version field |
+      |------|---------------|
+      | `pubspec.yaml` | `version: X.Y.Z` or `version: X.Y.Z+BUILD` (Flutter/Dart) |
+      | `package.json` | `"version": "X.Y.Z"` |
+      | `Cargo.toml` | `version = "X.Y.Z"` under `[package]` |
+      | `pyproject.toml` | `version = "X.Y.Z"` under `[project]` or `[tool.poetry]` |
+      | `build.gradle` / `build.gradle.kts` | `versionName "X.Y.Z"` (and `versionCode N`) |
+      | `VERSION` / `version.txt` | bare `X.Y.Z` |
+
+      If none is found, **skip the bump silently**, note it to the user, and continue — never fail the PR over a missing version file.
+
+   b. **Check whether it's already bumped.** Resolve the PR base branch:
+      ```bash
+      BASE=$(git rev-parse --abbrev-ref origin/HEAD 2>/dev/null | sed 's@^origin/@@')
+      [ -z "$BASE" ] && BASE=$(git remote show origin 2>/dev/null | sed -n 's/.*HEAD branch: //p')
+      [ -z "$BASE" ] && BASE=main
+      ```
+      Compare the working-tree version against the base branch's copy:
+      ```bash
+      git show "origin/$BASE:<version_file>" 2>/dev/null
+      ```
+      - If the working-tree version **differs** from the base version → already bumped. **Skip**, and tell the user the existing new version.
+      - If `origin/$BASE` isn't available, run `git fetch origin "$BASE"` once. If still unavailable, compare against `HEAD:<version_file>` instead; when genuinely in doubt, **bump** (a duplicate-looking bump is safer than a PR with no bump).
+
+   c. **Decide the bump level** (only if not already bumped):
+      - `$ARGUMENTS` overrides everything: `major` / `minor` / `patch` → use that; `no version bump` / `skip version` → skip.
+      - Otherwise infer from the step-2 change analysis: breaking change → **major**; new feature (`feat:`) → **minor**; everything else (fix/refactor/chore/docs) → **patch**.
+      - For `pubspec.yaml` with a `+BUILD` suffix, always also increment `BUILD` by 1. For `build.gradle`, also increment `versionCode` by 1.
+
+   d. **Apply the bump** by editing only the version line of the detected file with the Edit tool (not `sed -i`). Then re-read that line to confirm the new value.
+
+   e. Report one line: `Version bumped: X.Y.Z → X.Y.Z' (<level>)`, or `Version bump skipped — <reason>`.
+
+   The bumped version file MUST be staged in the same commit as the rest of the changes (next step). The version bump happens once per PR here in Phase 1 — Phase 4 fix rounds must NOT re-bump (the step-3b check already guarantees this).
+
+4. Stage specific files (not `git add -A`) — including the bumped version file — commit, verify with `git status`.
 
 ## Phase 2: Push and Create PR
 
@@ -301,6 +340,8 @@ After Codex gives a clean review (or user elects to merge):
 - If the PR has merge conflicts, notify the user rather than resolving automatically.
 - Extract {owner}/{repo} from `git remote -v` output, don't hardcode.
 - Parse the PR number from the `gh pr create` output URL.
+- Auto-bump the version exactly once per PR, in Phase 1, and only if it isn't already bumped vs the base branch. Never bump in Phase 4 fix rounds. Never bump if no version file exists or the user said `no version bump` — skip gracefully, never fail the PR over versioning.
+- Bump the version line with the Edit tool, never `sed -i`. Default to a **patch** bump; use **minor** for `feat:`, **major** for breaking changes, or whatever level the user specified in `$ARGUMENTS`.
 
 ## Examples
 
@@ -309,4 +350,6 @@ After Codex gives a clean review (or user elects to merge):
 /create-pr for all uncommitted changes
 /create-pr and merge after codex review
 /create-pr fix: update auth service
+/create-pr bump minor
+/create-pr no version bump
 ```
