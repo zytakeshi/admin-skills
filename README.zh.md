@@ -11,6 +11,7 @@
 - **`/deploy`** — 零停机部署，强制备份、差异检测、自动清理缓存。再也不会忘记回滚方案。
 - **`/commit-push`** — 分析 diff，生成规范的 commit message，安全推送。告别 "fix stuff" 提交。
 - **`/create-pr`** — 创建 PR 后自动由 [OpenAI Codex](https://chatgpt.com/codex) 审查。审查完成后，Claude 自动读取反馈、修复认可的问题、推送修复，然后询问你是否合并 — 全流程端到端自动化。
+- **`/html-specialist`** — 生成**单文件、自包含、带动画**的 HTML 讲解页（暗色滚动叙事、CJK 字体兼容、零依赖），用于讲解概念、系统、数据或产品。
 
 > **注意（2026年3月31日起）：** Codex 代码审查现已计入常规 Codex 使用额度，不再享有独立配额。频繁使用代码审查可能会更快达到 Codex 整体限额。详见 [OpenAI 公告](https://chatgpt.com/codex)。
 
@@ -26,6 +27,7 @@ npx skills add zytakeshi/admin-skills
 npx skills add zytakeshi/admin-skills@deploy
 npx skills add zytakeshi/admin-skills@commit-push
 npx skills add zytakeshi/admin-skills@create-pr
+npx skills add zytakeshi/admin-skills@html-specialist
 ```
 
 ## 可用技能
@@ -35,6 +37,7 @@ npx skills add zytakeshi/admin-skills@create-pr
 | [deploy](skills/deploy/) | 通过 SSH/SCP 部署到远程服务器，自带备份、差异检测、缓存清理和冒烟测试 |
 | [commit-push](skills/commit-push/) | 分析改动，生成 commit message，一键暂存、提交、推送 |
 | [create-pr](skills/create-pr/) | PR 全生命周期自动化：提交、推送、创建 PR、等待 Codex 审查、修复问题、合并 |
+| [html-specialist](skills/html-specialist/) | 生成单文件动画 HTML 讲解页 — 滚动叙事、CJK 兼容、零依赖 |
 
 ## 使用方法
 
@@ -43,6 +46,7 @@ npx skills add zytakeshi/admin-skills@create-pr
 - `/deploy` — 执行部署工作流
 - `/commit-push` — 分析改动、提交、推送
 - `/create-pr` — 创建 PR 并自动接入 Codex 代码审查
+- `/html-specialist` — 生成单文件动画 HTML 讲解页
 
 ## 相关项目
 

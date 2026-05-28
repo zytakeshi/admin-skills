@@ -17,6 +17,7 @@ Each skill is a single `SKILL.md` file inside `skills/<skill-name>/`. There is n
 | `skills/deploy/` | SSH/SCP deployment with backup, drift detection, cache clearing, smoke testing |
 | `skills/commit-push/` | Smart commit message generation, stage, commit, push in one step |
 | `skills/create-pr/` | Full PR lifecycle: commit → push → create PR → wait for Codex review → fix → merge |
+| `skills/html-specialist/` | Build a single self-contained animated HTML explainer (scrollytelling, CJK-safe, zero deps) |
 
 ## Skill Authoring Conventions
 

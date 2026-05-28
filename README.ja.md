@@ -11,6 +11,7 @@ Claude Code 向けのシステム管理・DevOps スキル集です。デプロ�
 - **`/deploy`** — バックアップ必須のゼロダウンタイムデプロイ。差分検出と自動キャッシュクリア付き。ロールバック忘れの心配なし。
 - **`/commit-push`** — diff を分析して conventional commit メッセージを生成し、安全にプッシュ。「fix stuff」コミットとはお別れ。
 - **`/create-pr`** — PR を作成し、[OpenAI Codex](https://chatgpt.com/codex) が自動レビュー。レビュー完了後、Claude がフィードバックを読み取り、同意した指摘を修正してプッシュし、マージを提案 — エンドツーエンドで完全自動化。
+- **`/html-specialist`** — コンセプト、システム、データ、プロダクトを解説する**単一ファイルのアニメーション HTML**（ダークモード・スクロールテリング・CJK 対応・依存ゼロ）を生成。
 
 > **注意（2026年3月31日）:** Codex コードレビューは専用枠ではなく、通常の Codex 使用量にカウントされるようになりました。コードレビューを多用すると、Codex の全体制限に早く達する場合があります。詳細は [OpenAI の告知](https://chatgpt.com/codex)を参照してください。
 
@@ -26,6 +27,7 @@ npx skills add zytakeshi/admin-skills
 npx skills add zytakeshi/admin-skills@deploy
 npx skills add zytakeshi/admin-skills@commit-push
 npx skills add zytakeshi/admin-skills@create-pr
+npx skills add zytakeshi/admin-skills@html-specialist
 ```
 
 ## 利用可能なスキル
@@ -35,6 +37,7 @@ npx skills add zytakeshi/admin-skills@create-pr
 | [deploy](skills/deploy/) | SSH/SCP でリモートサーバーにデプロイ。バックアップ、差分検出、キャッシュクリア、スモークテスト付き |
 | [commit-push](skills/commit-push/) | 変更を分析し、コミットメッセージを生成、ステージ・コミット・プッシュを一括実行 |
 | [create-pr](skills/create-pr/) | PR の全ライフサイクルを自動化: コミット、プッシュ、PR 作成、Codex レビュー待機、修正、マージ |
+| [html-specialist](skills/html-specialist/) | 単一ファイルのアニメーション HTML 解説ページを生成 — スクロールテリング、CJK 対応、依存ゼロ |
 
 ## 使い方
 
@@ -43,6 +46,7 @@ npx skills add zytakeshi/admin-skills@create-pr
 - `/deploy` — デプロイワークフローを実行
 - `/commit-push` — 変更を分析、コミット、プッシュ
 - `/create-pr` — Codex コードレビュー付き PR を作成
+- `/html-specialist` — 単一ファイルのアニメーション HTML 解説ページを構築
 
 ## 関連プロジェクト
 
