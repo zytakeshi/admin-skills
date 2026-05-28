@@ -18,6 +18,11 @@ Each skill is a single `SKILL.md` file inside `skills/<skill-name>/`. There is n
 | `skills/commit-push/` | Smart commit message generation, stage, commit, push in one step |
 | `skills/create-pr/` | Full PR lifecycle: commit → push → create PR → wait for Codex review → fix → merge |
 | `skills/html-specialist/` | Build a single self-contained animated HTML explainer (scrollytelling, CJK-safe, zero deps) |
+| `skills/codex/` | Bridge to OpenAI Codex CLI for code review / consultation, with streaming progress and per-task ID result files |
+| `skills/codexloop/` | Iterative Codex review-and-fix loop — review, fix agreed findings, re-review, until clean or stable impasse |
+| `skills/fleet-review/` | Parallel codebase audit with 10–15 read-only sub-agents, language-agnostic, planning-only |
+| `skills/team/` | Orchestrate parallel agent teams via `TeamCreate` + tmux-pane teammates, with integration validation |
+| `skills/finish-translation/` | Multi-framework i18n: detect → audit → propagate / find hardcoded strings (ARB, JSON, .strings, .xcstrings, gettext, YAML, Android XML, .resx) |
 
 ## Skill Authoring Conventions
 
