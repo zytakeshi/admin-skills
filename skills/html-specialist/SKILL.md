@@ -19,6 +19,34 @@ The viewer must, in one scroll, walk away with the **one key insight** you set o
 
 ---
 
+## Core principles — the five defaults you never skip
+
+These are *why this skill exists*. They are the baseline, not the upgrade — the user should **never have to ask for them**. Apply all five on every page unless the user explicitly opts out.
+
+### 1. Show, don't tell — visualization over prose
+Default to a **diagram, animation, or visual metaphor**. Reach for text only when an idea genuinely can't be drawn. If a paragraph could be a picture, make it a picture; prose is the caption, not the content.
+
+> **Before** (avoid): three paragraphs explaining how a firewall rejects a packet.
+> **After** (prefer): an animated packet flying at a wall, bouncing off, with a one-line caption underneath.
+
+Rule of thumb: **if a scene is mostly text, you haven't finished designing it.**
+
+### 2. Before / after everywhere it fits
+Contrast is the fastest teacher. Don't save before/after for the summary scene — use it at **every point where something changes**: the broken way vs. your way, naive vs. optimized, attack-succeeds vs. attack-blocked. Show the two states **side by side, or as a toggle/slider** — never as two separate paragraphs the reader has to hold in their head.
+
+### 3. Animate the change, don't describe it
+Anything that moves, flows, transforms, or fails over **should be shown moving**: a packet travels, a queue fills, a node lights up, a wall blocks. Static-then-static loses the "aha". Always honor `prefers-reduced-motion` (§4.5) — animation enriches the story, but the point must still land with motion off.
+
+### 4. Make it intuitive — a non-expert gets it in 5 seconds
+Lead with **physical, real-world metaphors** (locks, walls, pipes, traffic, doors, keys). Establish a consistent visual legend in the hero (one color = one role, §4.1) and never break it for the rest of the page. The viewer should *feel* the answer before they finish reading it.
+
+### 5. Easy-to-understand language
+Write for a smart person **outside the field**. Short sentences. Plain words over jargon. When a technical term is unavoidable, define it inline the first time in one clause. Default to the user's language; for CJK use the §4.2 font stack. Prefer "the server says no" over "the endpoint returns a 403".
+
+> **Self-check before delivering:** could a non-technical friend scroll this once and explain the one insight back to you? If not, you've *told* instead of *shown* — go back to principle 1.
+
+---
+
 ## Step 1 — Clarify intent (one tight round, then go)
 
 Before writing a line of code, lock down:
@@ -292,6 +320,16 @@ Don't animate first and lay out second. You'll repaint everything.
 ---
 
 ## Step 6 — Defensive checks (every build)
+
+Editorial checks first — these are the point of the skill (see Core principles):
+
+- [ ] **Visual-first:** no scene is a wall of text — each makes its point with a diagram, animation, or visual contrast.
+- [ ] **Before/after present:** the key change is shown side-by-side or as a toggle, not described in prose.
+- [ ] **Motion shows the change:** transitions/flows/failures are animated, and still land with `prefers-reduced-motion` on.
+- [ ] **Intuitive metaphor + consistent legend:** one color = one role, established in the hero and never broken.
+- [ ] **Plain language:** jargon defined inline or removed; a non-expert could explain the one insight back.
+
+Then the technical checks:
 
 - [ ] **Self-contained:** `<style>` and `<script>` are inline; the file opens standalone.
 - [ ] **No console errors** on load and during scroll.
