@@ -14,6 +14,7 @@ Claude Code 向けのシステム管理・DevOps スキル集です。デプロ�
 - **`/html-specialist`** — コンセプト、システム、データ、プロダクトを解説する**単一ファイルのアニメーション HTML**（ダークモード・スクロールテリング・CJK 対応・依存ゼロ）を生成。
 - **`/codex`** — OpenAI Codex CLI への橋渡し。コードレビュー、設計相談、バグ調査、セキュリティ監査、セカンドオピニオン用。イベントをストリーミングで通知し、最終回答を実行ごとの結果ファイルに保存。diff の外側の cross-cutting な統合問題も指摘。
 - **`/codexloop`** — Codex を使った反復レビュー＆修正ループ。Codex がレビュー → 合意した指摘を Claude が修正 → 再レビュー → きれいになるか正直な合意不能点に到達するまで継続。回数制限なし。
+- **`/codex-test`** — ヘッドレス/無人のブラウザ・スモーク/e2e テストを Codex CLI にオフロード。隔離された Playwright ブラウザを操作（必要な場合のみログイン済み Chrome セッションに接続）し、フローが通るまでコードを修正して再実行可能。進捗をストリーミングし、PASS/FAIL の判定と加えた変更を報告。
 - **`/fleet-review`** — 10〜15 体の読み取り専用サブエージェントを並列展開し、コードベース全体をスキャンしてランク付き監査レポートを生成。言語非依存。純粋な計画フェーズ — ファイルは一切変更しない。
 - **`/team`** — エージェントチームを編成して計画書・仕様書・大規模タスクを並列実装。作業を分解し、スコープ付きチームメイトを tmux ペインで起動し、成果物を統合。
 - **`/finish-translation`** — プロジェクトの i18n フレームワーク（ARB・JSON/i18next・.strings・.xcstrings・gettext・YAML/Rails・Android XML・.resx）を自動検出し、翻訳の伝播・監査・ハードコード文字列検出を実行。
@@ -35,6 +36,7 @@ npx skills add zytakeshi/admin-skills@create-pr
 npx skills add zytakeshi/admin-skills@html-specialist
 npx skills add zytakeshi/admin-skills@codex
 npx skills add zytakeshi/admin-skills@codexloop
+npx skills add zytakeshi/admin-skills@codex-test
 npx skills add zytakeshi/admin-skills@fleet-review
 npx skills add zytakeshi/admin-skills@team
 npx skills add zytakeshi/admin-skills@finish-translation
@@ -50,6 +52,7 @@ npx skills add zytakeshi/admin-skills@finish-translation
 | [html-specialist](skills/html-specialist/) | 単一ファイルのアニメーション HTML 解説ページを生成 — スクロールテリング、CJK 対応、依存ゼロ |
 | [codex](skills/codex/) | OpenAI Codex CLI へのブリッジ。コードレビュー・設計相談・セキュリティ監査・セカンドオピニオン、進捗ストリーミング付き |
 | [codexloop](skills/codexloop/) | Codex を使った反復レビュー＆修正ループ。きれいになるか正直な合意不能点まで継続 |
+| [codex-test](skills/codex-test/) | ヘッドレス/無人のブラウザ・スモーク/e2e テストを Codex CLI にオフロード — Playwright 優先（隔離ブラウザ）、コード修正＆再実行可、PASS/FAIL を報告 |
 | [fleet-review](skills/fleet-review/) | 10〜15 体の読み取り専用サブエージェントを並列展開し、コードベース全体を監査。純粋な計画フェーズで、言語非依存 |
 | [team](skills/team/) | エージェントチームを編成して並列実装。作業分解 → tmux ペインでチームメイト起動 → 成果物統合 |
 | [finish-translation](skills/finish-translation/) | i18n フレームワークを自動検出し、全ロケールへの翻訳伝播・監査・ハードコード文字列検出を実行 |
@@ -64,6 +67,7 @@ npx skills add zytakeshi/admin-skills@finish-translation
 - `/html-specialist` — 単一ファイルのアニメーション HTML 解説ページを構築
 - `/codex` — OpenAI Codex CLI を呼んでレビュー / 相談
 - `/codexloop` — Codex 反復レビュー＆修正ループ
+- `/codex-test` — ヘッドレスのブラウザ・スモーク / e2e テストを Codex にオフロード
 - `/fleet-review` — 10〜15 体の並列サブエージェントでコードベース監査
 - `/team` — エージェントチームを起動してマルチファイルタスクを実装
 - `/finish-translation` — 全ロケールの翻訳を同期 / 監査

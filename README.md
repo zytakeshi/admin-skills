@@ -14,6 +14,7 @@ A collection of sysadmin and DevOps skills for Claude Code. Automate deployments
 - **`/html-specialist`** — Produces a single self-contained animated `.html` page (dark scrollytelling, CJK-safe, zero dependencies) that explains a concept, system, dataset, or product.
 - **`/codex`** — Bridge to the OpenAI Codex CLI for code review, design consultation, bug investigation, security audits, and second opinions. Streams events as they arrive, captures the final answer to a per-invocation result file, and surfaces cross-cutting integration findings beyond the diff.
 - **`/codexloop`** — Iterative review-and-fix loop with Codex. Codex reviews, Claude fixes the findings it agrees with, repeat until clean (or both sides reach an honest impasse). No fixed iteration cap.
+- **`/codex-test`** — Offload a headless/unattended browser smoke or e2e test to the Codex CLI. It drives an isolated Playwright browser (or attaches to a logged-in Chrome session when one's required), may fix code and re-run until the flow passes, streams progress, and reports a PASS/FAIL verdict plus any changes it made.
 - **`/fleet-review`** — Deploy 10–15 parallel read-only sub-agents to scan a codebase and produce a ranked audit report. Language-agnostic. Pure planning — no file modifications.
 - **`/team`** — Orchestrate parallel agent teams to implement plans, specs, or multi-file tasks. Decomposes the work, spawns scoped teammates in tmux panes, coordinates outputs.
 - **`/finish-translation`** — Auto-detect your project's i18n framework (ARB, JSON/i18next, .strings, .xcstrings, gettext, YAML/Rails, Android XML, .resx) and propagate, audit, or scan for hardcoded strings.
@@ -35,6 +36,7 @@ npx skills add zytakeshi/admin-skills@create-pr
 npx skills add zytakeshi/admin-skills@html-specialist
 npx skills add zytakeshi/admin-skills@codex
 npx skills add zytakeshi/admin-skills@codexloop
+npx skills add zytakeshi/admin-skills@codex-test
 npx skills add zytakeshi/admin-skills@fleet-review
 npx skills add zytakeshi/admin-skills@team
 npx skills add zytakeshi/admin-skills@finish-translation
@@ -50,6 +52,7 @@ npx skills add zytakeshi/admin-skills@finish-translation
 | [html-specialist](skills/html-specialist/) | Build a single self-contained animated HTML explainer — scrollytelling, CJK-safe, zero dependencies |
 | [codex](skills/codex/) | Bridge to OpenAI Codex CLI for code review, design consultation, security audits, and second opinions — with streaming progress |
 | [codexloop](skills/codexloop/) | Iterative review-and-fix loop with Codex: review → fix → re-review until clean or honest impasse |
+| [codex-test](skills/codex-test/) | Offload a headless/unattended browser smoke or e2e test to the Codex CLI — Playwright-first (isolated browser), may fix code and re-run, reports PASS/FAIL |
 | [fleet-review](skills/fleet-review/) | Deploy 10–15 parallel read-only sub-agents to audit a codebase. Pure planning, no file modifications. Language-agnostic |
 | [team](skills/team/) | Orchestrate parallel agent teams: decompose work, spawn scoped teammates in tmux panes, coordinate outputs |
 | [finish-translation](skills/finish-translation/) | Auto-detect your i18n framework and propagate / audit / scan for hardcoded strings across all locales |
@@ -64,6 +67,7 @@ After installing, use the skills in Claude Code:
 - `/html-specialist` — build a single-file animated HTML explainer
 - `/codex` — call OpenAI Codex CLI for review / consultation
 - `/codexloop` — iterative codex review-and-fix loop until clean
+- `/codex-test` — offload a headless browser smoke / e2e test to Codex
 - `/fleet-review` — parallel codebase audit with 10–15 read-only sub-agents
 - `/team` — spawn an agent team to implement a multi-file task
 - `/finish-translation` — sync / audit translations across all locales
