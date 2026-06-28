@@ -37,6 +37,7 @@ npx skills add zytakeshi/admin-skills@html-specialist
 npx skills add zytakeshi/admin-skills@codex
 npx skills add zytakeshi/admin-skills@codexloop
 npx skills add zytakeshi/admin-skills@codex-test
+npx skills add zytakeshi/admin-skills@ask-chatgpt-pro
 npx skills add zytakeshi/admin-skills@fleet-review
 npx skills add zytakeshi/admin-skills@team
 npx skills add zytakeshi/admin-skills@finish-translation
@@ -53,6 +54,7 @@ npx skills add zytakeshi/admin-skills@finish-translation
 | [codex](skills/codex/) | Bridge to OpenAI Codex CLI for code review, design consultation, security audits, and second opinions — with streaming progress |
 | [codexloop](skills/codexloop/) | Iterative review-and-fix loop with Codex: review → fix → re-review until clean or honest impasse |
 | [codex-test](skills/codex-test/) | Offload a headless/unattended browser smoke or e2e test to the Codex CLI — Playwright-first (isolated browser), may fix code and re-run, reports PASS/FAIL |
+| [ask-chatgpt-pro](skills/ask-chatgpt-pro/) | Consult the GPT Pro model in the ChatGPT browser UI for important specs, architecture/migration decisions, comparisons, source-backed research, or critique — then verify and adapt locally |
 | [fleet-review](skills/fleet-review/) | Deploy 10–15 parallel read-only sub-agents to audit a codebase. Pure planning, no file modifications. Language-agnostic |
 | [team](skills/team/) | Orchestrate parallel agent teams: decompose work, spawn scoped teammates in tmux panes, coordinate outputs |
 | [finish-translation](skills/finish-translation/) | Auto-detect your i18n framework and propagate / audit / scan for hardcoded strings across all locales |
@@ -68,6 +70,7 @@ After installing, use the skills in Claude Code:
 - `/codex` — call OpenAI Codex CLI for review / consultation
 - `/codexloop` — iterative codex review-and-fix loop until clean
 - `/codex-test` — offload a headless browser smoke / e2e test to Codex
+- `/ask-chatgpt-pro` — consult the GPT Pro model in the ChatGPT browser UI for high-stakes decisions and research
 - `/fleet-review` — parallel codebase audit with 10–15 read-only sub-agents
 - `/team` — spawn an agent team to implement a multi-file task
 - `/finish-translation` — sync / audit translations across all locales
