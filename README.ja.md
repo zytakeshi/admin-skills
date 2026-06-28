@@ -18,6 +18,7 @@ Claude Code 向けのシステム管理・DevOps スキル集です。デプロ�
 - **`/fleet-review`** — 10〜15 体の読み取り専用サブエージェントを並列展開し、コードベース全体をスキャンしてランク付き監査レポートを生成。言語非依存。純粋な計画フェーズ — ファイルは一切変更しない。
 - **`/team`** — エージェントチームを編成して計画書・仕様書・大規模タスクを並列実装。作業を分解し、スコープ付きチームメイトを tmux ペインで起動し、成果物を統合。
 - **`/finish-translation`** — プロジェクトの i18n フレームワーク（ARB・JSON/i18next・.strings・.xcstrings・gettext・YAML/Rails・Android XML・.resx）を自動検出し、翻訳の伝播・監査・ハードコード文字列検出を実行。
+- **`/ask-grok`** — 既存の X Premium / SuperGrok サブスクリプション（APIキー不要）で Grok（xAI）にリアルタイムの Web・X/Twitter 情報を照会。「最新の〜は？」「速報」「ツールの最新バージョン」「Xで〜について何と言われている？」を公式 Grok CLI 経由で Grok にルーティングし、回答をソースリンク付きでそのまま表示。
 
 > **注意（2026年3月31日）:** Codex コードレビューは専用枠ではなく、通常の Codex 使用量にカウントされるようになりました。コードレビューを多用すると、Codex の全体制限に早く達する場合があります。詳細は [OpenAI の告知](https://chatgpt.com/codex)を参照してください。
 
@@ -40,6 +41,7 @@ npx skills add zytakeshi/admin-skills@codex-test
 npx skills add zytakeshi/admin-skills@fleet-review
 npx skills add zytakeshi/admin-skills@team
 npx skills add zytakeshi/admin-skills@finish-translation
+npx skills add zytakeshi/admin-skills@ask-grok
 ```
 
 ## 利用可能なスキル
@@ -56,6 +58,7 @@ npx skills add zytakeshi/admin-skills@finish-translation
 | [fleet-review](skills/fleet-review/) | 10〜15 体の読み取り専用サブエージェントを並列展開し、コードベース全体を監査。純粋な計画フェーズで、言語非依存 |
 | [team](skills/team/) | エージェントチームを編成して並列実装。作業分解 → tmux ペインでチームメイト起動 → 成果物統合 |
 | [finish-translation](skills/finish-translation/) | i18n フレームワークを自動検出し、全ロケールへの翻訳伝播・監査・ハードコード文字列検出を実行 |
+| [ask-grok](skills/ask-grok/) | 公式 Grok CLI（サブスク OAuth、APIキー不要）で Grok（xAI）にリアルタイム Web・X/Twitter 情報を照会 — 最新リリース、速報、Xの反応を、ソースリンク付きでそのまま表示 |
 
 ## 使い方
 
@@ -71,6 +74,7 @@ npx skills add zytakeshi/admin-skills@finish-translation
 - `/fleet-review` — 10〜15 体の並列サブエージェントでコードベース監査
 - `/team` — エージェントチームを起動してマルチファイルタスクを実装
 - `/finish-translation` — 全ロケールの翻訳を同期 / 監査
+- `/ask-grok` — Grok からライブ Web・X 情報を取得し、ソース付きでそのまま表示
 
 ## 関連プロジェクト
 

@@ -18,6 +18,7 @@ A collection of sysadmin and DevOps skills for Claude Code. Automate deployments
 - **`/fleet-review`** — Deploy 10–15 parallel read-only sub-agents to scan a codebase and produce a ranked audit report. Language-agnostic. Pure planning — no file modifications.
 - **`/team`** — Orchestrate parallel agent teams to implement plans, specs, or multi-file tasks. Decomposes the work, spawns scoped teammates in tmux panes, coordinates outputs.
 - **`/finish-translation`** — Auto-detect your project's i18n framework (ARB, JSON/i18next, .strings, .xcstrings, gettext, YAML/Rails, Android XML, .resx) and propagate, audit, or scan for hardcoded strings.
+- **`/ask-grok`** — Consult Grok (xAI) for real-time web and X/Twitter knowledge using your existing X Premium / SuperGrok subscription (no API key). Routes "what's the latest on…", breaking news, newest tool versions, and "what are people saying on X about…" to Grok via the official Grok CLI, then shows the answer verbatim with its source links.
 
 > **Note (March 31, 2026):** Codex Code Review now counts toward your regular Codex usage limit instead of having a separate allowance. Heavy Code Review usage may cause you to reach your overall Codex limit sooner. See [OpenAI's announcement](https://chatgpt.com/codex) for details.
 
@@ -41,6 +42,7 @@ npx skills add zytakeshi/admin-skills@ask-chatgpt-pro
 npx skills add zytakeshi/admin-skills@fleet-review
 npx skills add zytakeshi/admin-skills@team
 npx skills add zytakeshi/admin-skills@finish-translation
+npx skills add zytakeshi/admin-skills@ask-grok
 ```
 
 ## Available Skills
@@ -58,6 +60,7 @@ npx skills add zytakeshi/admin-skills@finish-translation
 | [fleet-review](skills/fleet-review/) | Deploy 10–15 parallel read-only sub-agents to audit a codebase. Pure planning, no file modifications. Language-agnostic |
 | [team](skills/team/) | Orchestrate parallel agent teams: decompose work, spawn scoped teammates in tmux panes, coordinate outputs |
 | [finish-translation](skills/finish-translation/) | Auto-detect your i18n framework and propagate / audit / scan for hardcoded strings across all locales |
+| [ask-grok](skills/ask-grok/) | Consult Grok (xAI) for real-time web + X/Twitter knowledge via the official Grok CLI (subscription OAuth, no API key) — latest releases, breaking news, social pulse, answers shown verbatim with source links |
 
 ## Usage
 
@@ -74,6 +77,7 @@ After installing, use the skills in Claude Code:
 - `/fleet-review` — parallel codebase audit with 10–15 read-only sub-agents
 - `/team` — spawn an agent team to implement a multi-file task
 - `/finish-translation` — sync / audit translations across all locales
+- `/ask-grok` — get live web / X answers from Grok, shown verbatim with sources
 
 ## See Also
 

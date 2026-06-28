@@ -18,6 +18,7 @@
 - **`/fleet-review`** — 派出 10〜15 个只读子代理并行扫描代码库，输出按严重度排序的审计报告。语言无关。纯计划阶段——零文件改动。
 - **`/team`** — 编排代理团队并行实施计划、规格或多文件任务。自动拆解工作、在 tmux 面板里生成带作用域的队员、整合各方输出。
 - **`/finish-translation`** — 自动检测项目的 i18n 框架（ARB、JSON/i18next、.strings、.xcstrings、gettext、YAML/Rails、Android XML、.resx），并执行翻译传播、审计或硬编码字符串扫描。
+- **`/ask-grok`** — 用你现有的 X Premium / SuperGrok 订阅（无需 API key）向 Grok（xAI）查询实时 Web 和 X/Twitter 信息。把「最新进展」「突发新闻」「工具最新版本」「X 上大家在聊什么」经官方 Grok CLI 路由给 Grok，并把回答连同来源链接原样展示。
 
 > **注意（2026年3月31日起）：** Codex 代码审查现已计入常规 Codex 使用额度，不再享有独立配额。频繁使用代码审查可能会更快达到 Codex 整体限额。详见 [OpenAI 公告](https://chatgpt.com/codex)。
 
@@ -40,6 +41,7 @@ npx skills add zytakeshi/admin-skills@codex-test
 npx skills add zytakeshi/admin-skills@fleet-review
 npx skills add zytakeshi/admin-skills@team
 npx skills add zytakeshi/admin-skills@finish-translation
+npx skills add zytakeshi/admin-skills@ask-grok
 ```
 
 ## 可用技能
@@ -56,6 +58,7 @@ npx skills add zytakeshi/admin-skills@finish-translation
 | [fleet-review](skills/fleet-review/) | 派出 10〜15 个只读子代理并行审计代码库，纯计划阶段、语言无关 |
 | [team](skills/team/) | 编排代理团队并行实施：拆解 → tmux 面板生成队员 → 整合输出 |
 | [finish-translation](skills/finish-translation/) | 自动检测 i18n 框架，传播 / 审计 / 扫描全部 locale 的翻译与硬编码字符串 |
+| [ask-grok](skills/ask-grok/) | 用官方 Grok CLI（订阅 OAuth，无需 API key）向 Grok（xAI）查询实时 Web 和 X/Twitter 信息 — 最新发布、突发新闻、社区风向，回答连同来源链接原样展示 |
 
 ## 使用方法
 
@@ -71,6 +74,7 @@ npx skills add zytakeshi/admin-skills@finish-translation
 - `/fleet-review` — 用 10〜15 个并行子代理审计代码库
 - `/team` — 启动代理团队实施多文件任务
 - `/finish-translation` — 同步 / 审计所有 locale 的翻译
+- `/ask-grok` — 从 Grok 获取实时 Web / X 信息，连同来源原样展示
 
 ## 相关项目
 

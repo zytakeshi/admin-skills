@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Architecture
 
-Each skill is a single `SKILL.md` file inside `skills/<skill-name>/`. There is no executable code — skills are declarative markdown with YAML frontmatter (name, description, trigger phrases) followed by step-by-step instructions Claude executes at runtime.
+Each skill is a `SKILL.md` file inside `skills/<skill-name>/`, with YAML frontmatter (name, description, trigger phrases) followed by step-by-step instructions Claude executes at runtime. Most skills are pure declarative markdown; a few also bundle a `scripts/` directory with an executable helper (e.g. `skills/ask-grok/scripts/ask_grok.sh`). Skills that bundle scripts must reference them relative to the skill's own directory (not a hardcoded absolute path) so they resolve regardless of install location.
 
 ### Current Skills
 
@@ -24,6 +24,7 @@ Each skill is a single `SKILL.md` file inside `skills/<skill-name>/`. There is n
 | `skills/fleet-review/` | Parallel codebase audit with 10–15 read-only sub-agents, language-agnostic, planning-only |
 | `skills/team/` | Orchestrate parallel agent teams via `TeamCreate` + tmux-pane teammates, with integration validation |
 | `skills/finish-translation/` | Multi-framework i18n: detect → audit → propagate / find hardcoded strings (ARB, JSON, .strings, .xcstrings, gettext, YAML, Android XML, .resx) |
+| `skills/ask-grok/` | Consult Grok (xAI) for real-time web + X/Twitter knowledge via the official Grok CLI (subscription OAuth, no API key); bundles `scripts/ask_grok.sh` (handles `--always-approve`, retry, JSON output, search+cite default) |
 
 ## Skill Authoring Conventions
 
