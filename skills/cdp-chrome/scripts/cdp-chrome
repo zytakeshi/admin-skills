@@ -45,7 +45,7 @@ SRC="${CDP_SOURCE_PROFILE:-$HOME/Library/Application Support/Google/Chrome}"
 PROFILE_DIR="${CDP_PROFILE_DIR:-Default}"
 CHROME="${CDP_CHROME:-/Applications/Google Chrome.app}"   # .app bundle for open -a
 ALLOW_ORIGINS="${CDP_ALLOW_ORIGINS-}"   # unset → empty → flag omitted (secure default)
-MARKER="$DST/.cdp-seeded"               # written "ok" only after a complete reseed
+MARKER="$DST/.cdp-seeded-$PROFILE_DIR"  # per-profile; written "ok" only after a complete reseed
 
 # A real CDP endpoint returns JSON containing webSocketDebuggerUrl. Use -f so HTTP
 # 4xx/5xx from some *other* service squatting on the port counts as "down", and
@@ -68,7 +68,15 @@ start() {
     # unrelated Chrome/CDP tool squatting on the port (which the MCP would then drive).
     lp=$(lsof -ti "tcp:$PORT" -sTCP:LISTEN 2>/dev/null | head -1)
     if [ -n "$lp" ] && pgrep -f -- "--user-data-dir=$DST" 2>/dev/null | grep -qw "$lp"; then
-      echo "already up on :$PORT"; exit 0
+      # It's our profile dir — but is it the requested profile? If you switched
+      # CDP_PROFILE_DIR since it launched, "already up" would be a lie (wrong session).
+      if pgrep -f -- "--profile-directory=$PROFILE_DIR" 2>/dev/null | grep -qw "$lp"; then
+        echo "already up on :$PORT"; exit 0
+      fi
+      echo "already up on :$PORT, but with a different profile than CDP_PROFILE_DIR=\"$PROFILE_DIR\"." >&2
+      echo "Quit it and re-run to switch profiles (or to apply a changed CDP_ALLOW_ORIGINS):" >&2
+      echo "  lsof -ti tcp:$PORT | xargs kill" >&2
+      exit 1
     fi
     echo "port $PORT already has a DevTools endpoint that is NOT the dedicated profile" >&2
     echo "($DST). Another Chrome or CDP tool is holding it — pointing the MCP here would" >&2
@@ -127,8 +135,13 @@ reseed() {
       echo "cause (disk space, permissions, quit source Chrome) and re-run." >&2
       exit 1
     }
-  # Local State holds os_crypt metadata + profile registry; copy it alongside.
-  cp -f "$SRC/Local State" "$DST/Local State" 2>/dev/null || true
+  # Local State holds os_crypt metadata + profile registry; it must copy too, or the
+  # snapshot is inconsistent — propagate failure instead of marking seeded.
+  if [ -f "$SRC/Local State" ] && ! cp -f "$SRC/Local State" "$DST/Local State"; then
+    echo "reseed FAILED: could not copy 'Local State' (disk/permissions) — NOT marked" >&2
+    echo "seeded; start will refuse it. Fix the cause and re-run." >&2
+    exit 1
+  fi
   printf 'ok\n' > "$MARKER"            # mark seeded only after a complete copy
   echo "reseed done"
 }
