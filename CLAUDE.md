@@ -25,6 +25,7 @@ Each skill is a `SKILL.md` file inside `skills/<skill-name>/`, with YAML frontma
 | `skills/team/` | Orchestrate parallel agent teams via `TeamCreate` + tmux-pane teammates, with integration validation |
 | `skills/finish-translation/` | Multi-framework i18n: detect → audit → propagate / find hardcoded strings (ARB, JSON, .strings, .xcstrings, gettext, YAML, Android XML, .resx) |
 | `skills/ask-grok/` | Consult Grok (xAI) for real-time web + X/Twitter knowledge via the official Grok CLI (subscription OAuth, no API key); bundles `scripts/ask_grok.sh` (handles `--always-approve`, retry, JSON output, search+cite default) |
+| `skills/cdp-chrome/` | Run Chrome DevTools (CDP) browser automation unattended on Chrome 136+ — attach a CDP client (chrome-devtools-mcp/Puppeteer/Playwright) to a dedicated, logged-in Chrome via `--browserUrl` so the "Allow remote debugging?" dialog never appears; bundles `scripts/cdp-chrome` (start/reseed/status/config). macOS |
 
 ## Skill Authoring Conventions
 
@@ -40,6 +41,7 @@ Each skill is a `SKILL.md` file inside `skills/<skill-name>/`, with YAML frontma
 - `gh` (GitHub CLI) — create-pr skill
 - `ssh`, `scp` — deploy skill
 - `~/ssh/hosts.md` — deploy skill looks here for server connection details
+- `curl`, `rsync`, Google Chrome (macOS) — cdp-chrome skill
 
 ## Downstream Repos
 

@@ -19,6 +19,7 @@
 - **`/team`** — 编排代理团队并行实施计划、规格或多文件任务。自动拆解工作、在 tmux 面板里生成带作用域的队员、整合各方输出。
 - **`/finish-translation`** — 自动检测项目的 i18n 框架（ARB、JSON/i18next、.strings、.xcstrings、gettext、YAML/Rails、Android XML、.resx），并执行翻译传播、审计或硬编码字符串扫描。
 - **`/ask-grok`** — 用你现有的 X Premium / SuperGrok 订阅（无需 API key）向 Grok（xAI）查询实时 Web 和 X/Twitter 信息。把「最新进展」「突发新闻」「工具最新版本」「X 上大家在聊什么」经官方 Grok CLI 路由给 Grok，并把回答连同来源链接原样展示。
+- **`/cdp-chrome`** — 在 Chrome 136+ 上让 Chrome DevTools（CDP）浏览器自动化**无人值守**运行：连接到一个专用的、已登录的 Chrome 实例（用 `--browserUrl`），从而再也不会弹出「Allow remote debugging?」原生授权框，`chrome-devtools-mcp` / Puppeteer / Playwright 也不再卡在连接处。附带 `cdp-chrome` 辅助脚本（start / reseed / status / config）。仅 macOS。
 
 > **注意（2026年3月31日起）：** Codex 代码审查现已计入常规 Codex 使用额度，不再享有独立配额。频繁使用代码审查可能会更快达到 Codex 整体限额。详见 [OpenAI 公告](https://chatgpt.com/codex)。
 
@@ -42,6 +43,7 @@ npx skills add zytakeshi/admin-skills@fleet-review
 npx skills add zytakeshi/admin-skills@team
 npx skills add zytakeshi/admin-skills@finish-translation
 npx skills add zytakeshi/admin-skills@ask-grok
+npx skills add zytakeshi/admin-skills@cdp-chrome
 ```
 
 ## 可用技能
@@ -59,6 +61,7 @@ npx skills add zytakeshi/admin-skills@ask-grok
 | [team](skills/team/) | 编排代理团队并行实施：拆解 → tmux 面板生成队员 → 整合输出 |
 | [finish-translation](skills/finish-translation/) | 自动检测 i18n 框架，传播 / 审计 / 扫描全部 locale 的翻译与硬编码字符串 |
 | [ask-grok](skills/ask-grok/) | 用官方 Grok CLI（订阅 OAuth，无需 API key）向 Grok（xAI）查询实时 Web 和 X/Twitter 信息 — 最新发布、突发新闻、社区风向，回答连同来源链接原样展示 |
+| [cdp-chrome](skills/cdp-chrome/) | 在 Chrome 136+ 上让 Chrome DevTools（CDP）自动化无人值守运行 — 用 `--browserUrl` 连接专用的已登录 Chrome，从此不再弹「Allow remote debugging?」授权框；附 `cdp-chrome` 脚本（start / reseed / status / config）。仅 macOS |
 
 ## 使用方法
 
@@ -75,6 +78,7 @@ npx skills add zytakeshi/admin-skills@ask-grok
 - `/team` — 启动代理团队实施多文件任务
 - `/finish-translation` — 同步 / 审计所有 locale 的翻译
 - `/ask-grok` — 从 Grok 获取实时 Web / X 信息，连同来源原样展示
+- `/cdp-chrome` — 配置无人值守的 Chrome DevTools 自动化（专用已登录 Chrome，无授权弹窗）
 
 ## 相关项目
 

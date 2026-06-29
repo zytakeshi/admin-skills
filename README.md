@@ -19,6 +19,7 @@ A collection of sysadmin and DevOps skills for Claude Code. Automate deployments
 - **`/team`** — Orchestrate parallel agent teams to implement plans, specs, or multi-file tasks. Decomposes the work, spawns scoped teammates in tmux panes, coordinates outputs.
 - **`/finish-translation`** — Auto-detect your project's i18n framework (ARB, JSON/i18next, .strings, .xcstrings, gettext, YAML/Rails, Android XML, .resx) and propagate, audit, or scan for hardcoded strings.
 - **`/ask-grok`** — Consult Grok (xAI) for real-time web and X/Twitter knowledge using your existing X Premium / SuperGrok subscription (no API key). Routes "what's the latest on…", breaking news, newest tool versions, and "what are people saying on X about…" to Grok via the official Grok CLI, then shows the answer verbatim with its source links.
+- **`/cdp-chrome`** — Run Chrome DevTools (CDP) browser automation **unattended** on Chrome 136+ by attaching to a dedicated, already-logged-in Chrome instance via `--browserUrl` — so the native "Allow remote debugging?" consent dialog never appears and `chrome-devtools-mcp` / Puppeteer / Playwright stop hanging on connect. Bundles a `cdp-chrome` helper (start / reseed / status / config). macOS.
 
 > **Note (March 31, 2026):** Codex Code Review now counts toward your regular Codex usage limit instead of having a separate allowance. Heavy Code Review usage may cause you to reach your overall Codex limit sooner. See [OpenAI's announcement](https://chatgpt.com/codex) for details.
 
@@ -43,6 +44,7 @@ npx skills add zytakeshi/admin-skills@fleet-review
 npx skills add zytakeshi/admin-skills@team
 npx skills add zytakeshi/admin-skills@finish-translation
 npx skills add zytakeshi/admin-skills@ask-grok
+npx skills add zytakeshi/admin-skills@cdp-chrome
 ```
 
 ## Available Skills
@@ -61,6 +63,7 @@ npx skills add zytakeshi/admin-skills@ask-grok
 | [team](skills/team/) | Orchestrate parallel agent teams: decompose work, spawn scoped teammates in tmux panes, coordinate outputs |
 | [finish-translation](skills/finish-translation/) | Auto-detect your i18n framework and propagate / audit / scan for hardcoded strings across all locales |
 | [ask-grok](skills/ask-grok/) | Consult Grok (xAI) for real-time web + X/Twitter knowledge via the official Grok CLI (subscription OAuth, no API key) — latest releases, breaking news, social pulse, answers shown verbatim with source links |
+| [cdp-chrome](skills/cdp-chrome/) | Run Chrome DevTools (CDP) automation unattended on Chrome 136+ — attach to a dedicated, logged-in Chrome via `--browserUrl` so the "Allow remote debugging?" dialog never appears; bundles a `cdp-chrome` helper (start / reseed / status / config). macOS |
 
 ## Usage
 
@@ -78,6 +81,7 @@ After installing, use the skills in Claude Code:
 - `/team` — spawn an agent team to implement a multi-file task
 - `/finish-translation` — sync / audit translations across all locales
 - `/ask-grok` — get live web / X answers from Grok, shown verbatim with sources
+- `/cdp-chrome` — set up unattended Chrome DevTools automation (dedicated logged-in Chrome, no permission dialog)
 
 ## See Also
 

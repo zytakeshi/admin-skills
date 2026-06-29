@@ -1,0 +1,97 @@
+#!/usr/bin/env bash
+#
+# cdp-chrome — run a dedicated, logged-in Chrome that CDP clients can attach to
+#              unattended (no "Allow remote debugging?" dialog) on Chrome 136+.
+#
+# WHY THIS EXISTS
+#   Chrome 136+ silently ignores --remote-debugging-port on the DEFAULT profile
+#   (anti-cookie-theft hardening). chrome-devtools-mcp --autoConnect attaches to
+#   your running Chrome and triggers a per-session native consent dialog that no
+#   automation can click. The fix: keep a SEPARATE Chrome instance, launched from
+#   a NON-default user-data-dir that is a COPY of your real profile. On macOS the
+#   Keychain "Chrome Safe Storage" key is per-user (not bound to the profile path),
+#   so the copied cookies still decrypt → the dedicated instance is logged in, and
+#   because you opened the port yourself there is no dialog. Point your CDP client
+#   at  --browserUrl http://127.0.0.1:<PORT>.
+#
+# PLATFORM: macOS (the Keychain-decrypts-a-copied-profile behavior is macOS-specific;
+#   on Linux/Windows the cookie-encryption key binding differs — see SKILL.md).
+#
+# USAGE
+#   cdp-chrome start     # bring the dedicated Chrome up on :PORT (idempotent)
+#   cdp-chrome reseed    # refresh the copied profile from your real one (logins)
+#   cdp-chrome status    # up / down
+#   cdp-chrome config    # print the chrome-devtools-mcp args to use
+#
+# ENV OVERRIDES (defaults shown)
+#   CDP_PORT=9222
+#   CDP_PROFILE="$HOME/.cache/cdp-mcp-profile"      # the dedicated (copied) profile
+#   CDP_SOURCE_PROFILE="$HOME/Library/Application Support/Google/Chrome"  # your real one
+#   CDP_CHROME="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+#
+set -u
+
+PORT="${CDP_PORT:-9222}"
+DST="${CDP_PROFILE:-$HOME/.cache/cdp-mcp-profile}"
+SRC="${CDP_SOURCE_PROFILE:-$HOME/Library/Application Support/Google/Chrome}"
+CHROME="${CDP_CHROME:-/Applications/Google Chrome.app/Contents/MacOS/Google Chrome}"
+
+is_up() { curl -sS --max-time 2 "http://127.0.0.1:$PORT/json/version" >/dev/null 2>&1; }
+
+start() {
+  if is_up; then echo "already up on :$PORT"; exit 0; fi
+  if [ ! -d "$DST/Default" ]; then
+    echo "no seeded profile at $DST"
+    echo "run:  cdp-chrome reseed   (quit your main Chrome first for a clean copy)"
+    exit 1
+  fi
+  # open -na launches a NEW instance even while your main Chrome is running.
+  # '--remote-allow-origins=*' must stay single-quoted so the shell does not glob it;
+  # it is required so the CDP client's websocket origin check passes.
+  open -na "$CHROME" --args \
+    --remote-debugging-port="$PORT" \
+    --user-data-dir="$DST" \
+    '--remote-allow-origins=*' \
+    --no-first-run --no-default-browser-check about:blank
+  for _ in $(seq 1 20); do is_up && { echo "up on :$PORT"; exit 0; }; sleep 1; done
+  echo "failed to come up on :$PORT"; exit 1
+}
+
+reseed() {
+  if [ ! -d "$SRC/Default" ]; then
+    echo "source profile not found at: $SRC" >&2
+    echo "set CDP_SOURCE_PROFILE to your real Chrome user-data-dir" >&2
+    exit 1
+  fi
+  echo "re-seeding $DST from $SRC (caches excluded)…"
+  mkdir -p "$DST"
+  # Copy the primary profile + Local State, excluding cache-y dirs to stay lean.
+  # Singleton* lock files are excluded so they don't clash with the live instance.
+  rsync -a \
+    --exclude 'Cache/' --exclude 'Code Cache/' --exclude 'GPUCache/' \
+    --exclude 'CacheStorage/' --exclude 'ScriptCache/' --exclude 'GrShaderCache/' \
+    --exclude 'ShaderCache/' --exclude 'GraphiteDawnCache/' --exclude 'DawnGraphiteCache/' \
+    --exclude 'DawnWebGPUCache/' --exclude 'component_crx_cache/' \
+    --exclude 'optimization_guide_model_store/' --exclude 'Singleton*' \
+    "$SRC/Local State" "$SRC/Default" "$DST/" && echo "reseed done"
+}
+
+config() {
+  cat <<EOF
+Point your CDP client at the dedicated instance. For chrome-devtools-mcp, set its
+args (e.g. in ~/.claude.json under mcpServers.chrome-devtools.args):
+
+  ["chrome-devtools-mcp@latest", "--browserUrl", "http://127.0.0.1:$PORT"]
+
+(Replace any "--autoConnect" arg. Restart the MCP host for it to take effect.)
+EOF
+}
+
+case "${1:-start}" in
+  start)  start ;;
+  reseed) reseed ;;
+  status) is_up && echo "up on :$PORT" || echo "down" ;;
+  config) config ;;
+  -h|--help|help) sed -n '2,40p' "$0" ;;
+  *) echo "usage: cdp-chrome {start|reseed|status|config}"; exit 2 ;;
+esac
