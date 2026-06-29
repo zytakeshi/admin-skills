@@ -130,7 +130,7 @@ Override defaults via env:
 | `CDP_SOURCE_PROFILE` | `~/Library/Application Support/Google/Chrome` | Your real Chrome user-data-dir to copy from |
 | `CDP_PROFILE_DIR` | `Default` | Which profile inside it — set to `"Profile 1"` etc. if your logged-in profile isn't Default |
 | `CDP_CHROME` | `/Applications/Google Chrome.app/…/Google Chrome` | Chrome binary |
-| `CDP_ALLOW_ORIGINS` | `*` | CDP websocket Origin allowlist — see **Security** below |
+| `CDP_ALLOW_ORIGINS` | *(unset)* | CDP websocket Origin allowlist. Unset = `--remote-allow-origins` is omitted (secure default — only no-Origin clients connect). See **Security** |
 
 ## Troubleshooting
 
@@ -146,10 +146,14 @@ Override defaults via env:
 - **`--remote-debugging-port` ignored / "non-default data directory"** → you're pointing
   at the default profile. The dir in `CDP_PROFILE` must be non-default (the bundled
   default `~/.cache/cdp-mcp-profile` already is).
-- **Websocket 403 / origin error** → your CDP client is sending an `Origin` the browser
-  rejects. The script passes `--remote-allow-origins="$CDP_ALLOW_ORIGINS"` (default `*`);
-  if you narrowed it (see **Security**), widen it back or set it to the client's exact
-  origin.
+- **Websocket 403 / origin error** → your CDP client sends an `Origin` header (most don't).
+  By default the script omits `--remote-allow-origins`, which rejects origin-bearing
+  connections. Set `CDP_ALLOW_ORIGINS` to that client's exact origin (e.g.
+  `CDP_ALLOW_ORIGINS="http://127.0.0.1:$PORT" cdp-chrome start`), or `*` to allow all
+  (insecure — see **Security**).
+- **`start` says "already up" but the wrong browser answers** → something else already
+  holds `CDP_PORT`. The port must be exclusive to this tool — pick a free `CDP_PORT`, or
+  stop the other listener (`lsof -ti tcp:$PORT`).
 
 ## Other platforms
 
@@ -164,13 +168,17 @@ into the dedicated profile once and reusing it. The `--browserUrl` + non-default
 
 This skill runs a **logged-in** browser with an open CDP endpoint, so treat it carefully.
 
-- **CDP origin allowlist (`CDP_ALLOW_ORIGINS`, default `*`).** `--remote-allow-origins=*`
-  disables Chrome's websocket Origin check, so *any* page that can reach `localhost:$PORT`
-  (e.g. a tab open in this same browser) could attach to CDP and act as your logged-in
-  self. The default is `*` because it's the value verified to work across CDP clients and
-  the port is bound to loopback only — but if your client connects with a stable origin,
-  **narrow it**: `CDP_ALLOW_ORIGINS="http://127.0.0.1:$PORT" cdp-chrome start` (or your
-  client's exact origin). Test your client still connects after narrowing.
+- **CDP origin allowlist (`CDP_ALLOW_ORIGINS`, default: unset → flag omitted).** A logged-in
+  browser with an open CDP port is a sensitive target: loopback binding does **not** stop a
+  malicious *web page* (open in any browser on the machine) from connecting to
+  `ws://127.0.0.1:$PORT` and driving your authenticated session. Chrome gates this with the
+  websocket `Origin` check. By default this skill **omits `--remote-allow-origins`**, so
+  Chrome accepts only connections with **no `Origin` header** — exactly what native CDP
+  clients (chrome-devtools-mcp / Puppeteer / Playwright) send — and rejects origin-bearing
+  web-page connections. (Verified: chrome-devtools-mcp attaches fine with the flag omitted.)
+  Only set `CDP_ALLOW_ORIGINS` if a client genuinely needs an allowed origin — prefer a
+  specific value (`http://127.0.0.1:$PORT`) over `*`. `CDP_ALLOW_ORIGINS="*"` disables the
+  check entirely and is **insecure** for a logged-in profile — avoid it.
 - The port binds to `127.0.0.1` only (Chrome default) — don't forward or expose it.
 - The dedicated profile holds real session cookies — treat `CDP_PROFILE` as sensitive;
   never commit or share it.
