@@ -28,7 +28,7 @@
 #   CDP_PROFILE="$HOME/.cache/cdp-mcp-profile"      # the dedicated (copied) user-data-dir
 #   CDP_SOURCE_PROFILE="$HOME/Library/Application Support/Google/Chrome"  # your real user-data-dir
 #   CDP_PROFILE_DIR="Default"                        # which profile inside it (e.g. "Profile 1")
-#   CDP_CHROME="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+#   CDP_CHROME="/Applications/Google Chrome.app"     # the .app BUNDLE (passed to open -a)
 #   CDP_ALLOW_ORIGINS=""   (UNSET = no --remote-allow-origins flag; see SECURITY in SKILL.md)
 #
 # SECURITY DEFAULT: CDP_ALLOW_ORIGINS is UNSET by default, so --remote-allow-origins is
@@ -43,8 +43,9 @@ PORT="${CDP_PORT:-9222}"
 DST="${CDP_PROFILE:-$HOME/.cache/cdp-mcp-profile}"
 SRC="${CDP_SOURCE_PROFILE:-$HOME/Library/Application Support/Google/Chrome}"
 PROFILE_DIR="${CDP_PROFILE_DIR:-Default}"
-CHROME="${CDP_CHROME:-/Applications/Google Chrome.app/Contents/MacOS/Google Chrome}"
+CHROME="${CDP_CHROME:-/Applications/Google Chrome.app}"   # .app bundle for open -a
 ALLOW_ORIGINS="${CDP_ALLOW_ORIGINS-}"   # unset → empty → flag omitted (secure default)
+MARKER="$DST/.cdp-seeded"               # written "ok" only after a complete reseed
 
 # A real CDP endpoint returns JSON containing webSocketDebuggerUrl. Use -f so HTTP
 # 4xx/5xx from some *other* service squatting on the port counts as "down", and
@@ -54,16 +55,22 @@ is_up() {
     | grep -q "webSocketDebuggerUrl"
 }
 
+# True if any Chrome is currently running against the dedicated profile dir, on ANY
+# port — more reliable than the port check for "is it safe to overwrite the profile".
+profile_in_use() { pgrep -f -- "--user-data-dir=$DST" >/dev/null 2>&1; }
+
+seeded() { [ "$(cat "$MARKER" 2>/dev/null)" = "ok" ]; }
+
 start() {
   if is_up; then echo "already up on :$PORT"; exit 0; fi
-  if [ ! -d "$DST/$PROFILE_DIR" ]; then
-    echo "no seeded profile at $DST/$PROFILE_DIR"
+  if ! seeded; then
+    echo "no valid seeded profile at $DST (seed marker missing or incomplete)"
     echo "run:  cdp-chrome reseed   (quit your main Chrome first for a clean copy)"
     exit 1
   fi
-  # open -na launches a NEW instance even while your main Chrome is running.
-  # --remote-allow-origins is added ONLY when CDP_ALLOW_ORIGINS is set (secure default:
-  # omitted → only no-Origin CDP clients connect). Quoted so the shell never globs a "*".
+  # open -na launches a NEW instance even while your main Chrome is running. CHROME is
+  # the .app BUNDLE path (open -a's selector). --remote-allow-origins is added ONLY when
+  # CDP_ALLOW_ORIGINS is set (secure default: omitted). Quoted so the shell never globs "*".
   local args=(
     --remote-debugging-port="$PORT"
     --user-data-dir="$DST"
@@ -82,19 +89,19 @@ reseed() {
     echo "set CDP_SOURCE_PROFILE (user-data-dir) and/or CDP_PROFILE_DIR (e.g. \"Profile 1\")" >&2
     exit 1
   fi
-  # Refuse to overwrite a live dedicated profile — the auto-start hook may have
-  # brought it up, and copying over an in-use profile dir corrupts it.
-  if is_up; then
-    echo "dedicated Chrome is running on :$PORT and is using $DST" >&2
-    echo "quit it first (close that Chrome window), then re-run: cdp-chrome reseed" >&2
+  # Refuse if the dedicated profile is live (on ANY port) — copying over an in-use
+  # profile dir corrupts it. Checks the process's --user-data-dir, not just the port.
+  if profile_in_use; then
+    echo "a Chrome is running against $DST (the dedicated profile)" >&2
+    echo "quit that instance first, then re-run: cdp-chrome reseed" >&2
     exit 1
   fi
-  echo "re-seeding $DST/$PROFILE_DIR from $SRC/$PROFILE_DIR (caches excluded, mirror)…"
   mkdir -p "$DST/$PROFILE_DIR"
+  printf 'in-progress\n' > "$MARKER"   # invalidate the marker until this reseed completes
+  echo "re-seeding $DST/$PROFILE_DIR from $SRC/$PROFILE_DIR (caches excluded, mirror)…"
   # --delete makes this a true fresh snapshot: files removed from the source
   # (logged-out cookies, deleted extensions, reset site data) are removed from the
-  # copy too, so revoked session state can't linger. Cache-y dirs and Singleton*
-  # lock files are excluded.
+  # copy too. Cache-y dirs and Singleton* lock files are excluded.
   rsync -a --delete \
     --exclude 'Cache/' --exclude 'Code Cache/' --exclude 'GPUCache/' \
     --exclude 'CacheStorage/' --exclude 'ScriptCache/' --exclude 'GrShaderCache/' \
@@ -103,12 +110,13 @@ reseed() {
     --exclude 'optimization_guide_model_store/' --exclude 'Singleton*' \
     "$SRC/$PROFILE_DIR/" "$DST/$PROFILE_DIR/" || {
       echo "reseed FAILED: rsync error — the profile copy is incomplete and was NOT" >&2
-      echo "marked as seeded. Fix the cause (disk space, permissions, quit source Chrome)" >&2
-      echo "and re-run. start will refuse this partial snapshot." >&2
+      echo "marked seeded (marker left 'in-progress'); 'start' will refuse it. Fix the" >&2
+      echo "cause (disk space, permissions, quit source Chrome) and re-run." >&2
       exit 1
     }
   # Local State holds os_crypt metadata + profile registry; copy it alongside.
   cp -f "$SRC/Local State" "$DST/Local State" 2>/dev/null || true
+  printf 'ok\n' > "$MARKER"            # mark seeded only after a complete copy
   echo "reseed done"
 }
 
