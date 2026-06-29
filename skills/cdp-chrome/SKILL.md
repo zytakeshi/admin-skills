@@ -1,6 +1,17 @@
 ---
 name: cdp-chrome
-description: Run Chrome DevTools (CDP) browser automation UNATTENDED on Chrome 136+ by attaching to a dedicated, already-logged-in Chrome instance instead of your default profile — so the native "Allow remote debugging?" consent dialog never appears. Use this skill whenever you set up, debug, or run chrome-devtools-mcp / Puppeteer / Playwright against a real logged-in Chrome and hit any of: the "Allow remote debugging?" dialog, a hang on connect/list_pages, "DevTools remote debugging requires a non-default data directory", --remote-debugging-port being silently ignored, or "I need browser automation to run without a human clicking a permission prompt". Triggers: "chrome-devtools won't connect", "allow remote debugging dialog", "unattended browser automation", "headless CDP login", "cdp-chrome", "browserUrl vs autoConnect", "chrome 136 remote debugging broken".
+description: >-
+  Run Chrome DevTools (CDP) browser automation UNATTENDED on Chrome 136+ by
+  attaching to a dedicated, already-logged-in Chrome instance instead of your
+  default profile — so the native "Allow remote debugging?" consent dialog never
+  appears. Use this skill whenever you set up, debug, or run chrome-devtools-mcp /
+  Puppeteer / Playwright against a real logged-in Chrome and hit any of: the
+  "Allow remote debugging?" dialog, a hang on connect/list_pages, "DevTools remote
+  debugging requires a non-default data directory", --remote-debugging-port being
+  silently ignored, or "I need browser automation to run without a human clicking
+  a permission prompt". Triggers: "chrome-devtools won't connect", "allow remote
+  debugging dialog", "unattended browser automation", "headless CDP login",
+  "cdp-chrome", "browserUrl vs autoConnect", "chrome 136 remote debugging broken".
 ---
 
 # cdp-chrome — unattended Chrome DevTools automation on Chrome 136+
@@ -54,12 +65,15 @@ window**, not your main one. That's the unavoidable cost of the Chrome 136+ desi
 
 ## Setup
 
-The skill bundles `scripts/cdp-chrome`. Reference it from the skill directory (do not
-hardcode an absolute path). For everyday use, install it on your PATH:
+The skill bundles `scripts/cdp-chrome`. For everyday use, install it on your PATH.
+Run these **from this skill's own directory** (the one containing `SKILL.md`; Claude is
+given its absolute path at invocation, so `cd` there first — don't rely on `$0`):
 
 ```bash
-install -m 0755 "$(dirname "$0")/scripts/cdp-chrome" "$HOME/.local/bin/cdp-chrome"
-# (or run it in place: ./scripts/cdp-chrome <command>)
+cd /path/to/skills/cdp-chrome   # this skill's directory
+mkdir -p "$HOME/.local/bin"
+install -m 0755 ./scripts/cdp-chrome "$HOME/.local/bin/cdp-chrome"
+# (or skip installing and run it in place: ./scripts/cdp-chrome <command>)
 ```
 
 1. **Seed the dedicated profile** (copies your real profile, caches excluded). For the
@@ -103,25 +117,39 @@ run on its own (it's idempotent and async-safe):
 | Command | What it does |
 |---------|--------------|
 | `cdp-chrome start`  | Launch the dedicated Chrome on `:PORT` if it's down (idempotent) |
-| `cdp-chrome reseed` | Re-copy your real profile into the dedicated dir to refresh logins (quit main Chrome first) |
+| `cdp-chrome reseed` | Mirror your real profile into the dedicated dir to refresh logins. Quit the dedicated Chrome first — `reseed` refuses to run while it's up (copying over a live profile corrupts it). Uses `rsync --delete`, so revoked sessions / removed extensions don't linger |
 | `cdp-chrome status` | Report up / down |
 | `cdp-chrome config` | Print the `--browserUrl` args for your CDP client |
 
-Override defaults via env: `CDP_PORT`, `CDP_PROFILE`, `CDP_SOURCE_PROFILE`, `CDP_CHROME`.
+Override defaults via env:
+
+| Var | Default | Purpose |
+|-----|---------|---------|
+| `CDP_PORT` | `9222` | CDP / remote-debugging port (bound to 127.0.0.1) |
+| `CDP_PROFILE` | `~/.cache/cdp-mcp-profile` | The dedicated (copied) user-data-dir — must be non-default |
+| `CDP_SOURCE_PROFILE` | `~/Library/Application Support/Google/Chrome` | Your real Chrome user-data-dir to copy from |
+| `CDP_PROFILE_DIR` | `Default` | Which profile inside it — set to `"Profile 1"` etc. if your logged-in profile isn't Default |
+| `CDP_CHROME` | `/Applications/Google Chrome.app/…/Google Chrome` | Chrome binary |
+| `CDP_ALLOW_ORIGINS` | `*` | CDP websocket Origin allowlist — see **Security** below |
 
 ## Troubleshooting
 
 - **CDP client can't connect / `list_pages` hangs** → the dedicated Chrome isn't running:
   `cdp-chrome start`. Confirm with `cdp-chrome status`.
 - **A site shows you logged out in automation** → the snapshot went stale:
-  `cdp-chrome reseed` (quit your main Chrome first for a consistent copy).
+  `cdp-chrome reseed`. Quit the dedicated Chrome first (reseed refuses while it's up); also
+  quit your main Chrome for the most consistent source copy.
+- **My logged-in profile isn't "Default"** (you use `Profile 1`, a work profile, etc.) →
+  set `CDP_PROFILE_DIR="Profile 1"` for both `reseed` and `start`.
 - **Still seeing "Allow remote debugging?"** → your client is still on `--autoConnect`,
   or the MCP host wasn't restarted after the config change. Re-check step 3.
 - **`--remote-debugging-port` ignored / "non-default data directory"** → you're pointing
   at the default profile. The dir in `CDP_PROFILE` must be non-default (the bundled
   default `~/.cache/cdp-mcp-profile` already is).
-- **Websocket 403 / origin error** → keep `--remote-allow-origins=*` (the script sets it;
-  it must be quoted so the shell doesn't glob it).
+- **Websocket 403 / origin error** → your CDP client is sending an `Origin` the browser
+  rejects. The script passes `--remote-allow-origins="$CDP_ALLOW_ORIGINS"` (default `*`);
+  if you narrowed it (see **Security**), widen it back or set it to the client's exact
+  origin.
 
 ## Other platforms
 
@@ -132,10 +160,20 @@ binds the key more tightly and a plain copy often won't decrypt cookies — pref
 into the dedicated profile once and reusing it. The `--browserUrl` + non-default
 `--user-data-dir` mechanism itself works on all three.
 
-## Safety
+## Security
 
-- Never `rm -rf` the profile dir; if you must reset it, move it aside (`mv`).
-- The dedicated profile contains real session cookies — treat `CDP_PROFILE` as sensitive
-  and don't commit or share it.
-- An open `--remote-debugging-port` is local attack surface; bind to `127.0.0.1` only
-  (default) and don't expose it.
+This skill runs a **logged-in** browser with an open CDP endpoint, so treat it carefully.
+
+- **CDP origin allowlist (`CDP_ALLOW_ORIGINS`, default `*`).** `--remote-allow-origins=*`
+  disables Chrome's websocket Origin check, so *any* page that can reach `localhost:$PORT`
+  (e.g. a tab open in this same browser) could attach to CDP and act as your logged-in
+  self. The default is `*` because it's the value verified to work across CDP clients and
+  the port is bound to loopback only — but if your client connects with a stable origin,
+  **narrow it**: `CDP_ALLOW_ORIGINS="http://127.0.0.1:$PORT" cdp-chrome start` (or your
+  client's exact origin). Test your client still connects after narrowing.
+- The port binds to `127.0.0.1` only (Chrome default) — don't forward or expose it.
+- The dedicated profile holds real session cookies — treat `CDP_PROFILE` as sensitive;
+  never commit or share it.
+- Never `rm -rf` the profile dir; if you must reset it, move it aside (`mv`). `reseed`
+  refuses to overwrite a running dedicated profile and mirrors with `rsync --delete` so
+  revoked sessions don't linger.

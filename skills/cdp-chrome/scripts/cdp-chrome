@@ -25,55 +25,78 @@
 #
 # ENV OVERRIDES (defaults shown)
 #   CDP_PORT=9222
-#   CDP_PROFILE="$HOME/.cache/cdp-mcp-profile"      # the dedicated (copied) profile
-#   CDP_SOURCE_PROFILE="$HOME/Library/Application Support/Google/Chrome"  # your real one
+#   CDP_PROFILE="$HOME/.cache/cdp-mcp-profile"      # the dedicated (copied) user-data-dir
+#   CDP_SOURCE_PROFILE="$HOME/Library/Application Support/Google/Chrome"  # your real user-data-dir
+#   CDP_PROFILE_DIR="Default"                        # which profile inside it (e.g. "Profile 1")
 #   CDP_CHROME="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+#   CDP_ALLOW_ORIGINS="*"                            # CDP websocket Origin allowlist; see SECURITY in SKILL.md
 #
 set -u
 
 PORT="${CDP_PORT:-9222}"
 DST="${CDP_PROFILE:-$HOME/.cache/cdp-mcp-profile}"
 SRC="${CDP_SOURCE_PROFILE:-$HOME/Library/Application Support/Google/Chrome}"
+PROFILE_DIR="${CDP_PROFILE_DIR:-Default}"
 CHROME="${CDP_CHROME:-/Applications/Google Chrome.app/Contents/MacOS/Google Chrome}"
+ALLOW_ORIGINS="${CDP_ALLOW_ORIGINS:-*}"
 
-is_up() { curl -sS --max-time 2 "http://127.0.0.1:$PORT/json/version" >/dev/null 2>&1; }
+# A real CDP endpoint returns JSON containing webSocketDebuggerUrl. Use -f so HTTP
+# 4xx/5xx from some *other* service squatting on the port counts as "down", and
+# grep the payload so only a genuine DevTools endpoint counts as "up".
+is_up() {
+  curl -fsS --max-time 2 "http://127.0.0.1:$PORT/json/version" 2>/dev/null \
+    | grep -q "webSocketDebuggerUrl"
+}
 
 start() {
   if is_up; then echo "already up on :$PORT"; exit 0; fi
-  if [ ! -d "$DST/Default" ]; then
-    echo "no seeded profile at $DST"
+  if [ ! -d "$DST/$PROFILE_DIR" ]; then
+    echo "no seeded profile at $DST/$PROFILE_DIR"
     echo "run:  cdp-chrome reseed   (quit your main Chrome first for a clean copy)"
     exit 1
   fi
   # open -na launches a NEW instance even while your main Chrome is running.
-  # '--remote-allow-origins=*' must stay single-quoted so the shell does not glob it;
-  # it is required so the CDP client's websocket origin check passes.
+  # --remote-allow-origins controls the CDP websocket Origin check; keep it quoted
+  # so the shell never globs a "*" value.
   open -na "$CHROME" --args \
     --remote-debugging-port="$PORT" \
     --user-data-dir="$DST" \
-    '--remote-allow-origins=*' \
+    --profile-directory="$PROFILE_DIR" \
+    --remote-allow-origins="$ALLOW_ORIGINS" \
     --no-first-run --no-default-browser-check about:blank
   for _ in $(seq 1 20); do is_up && { echo "up on :$PORT"; exit 0; }; sleep 1; done
   echo "failed to come up on :$PORT"; exit 1
 }
 
 reseed() {
-  if [ ! -d "$SRC/Default" ]; then
-    echo "source profile not found at: $SRC" >&2
-    echo "set CDP_SOURCE_PROFILE to your real Chrome user-data-dir" >&2
+  if [ ! -d "$SRC/$PROFILE_DIR" ]; then
+    echo "source profile not found: $SRC/$PROFILE_DIR" >&2
+    echo "set CDP_SOURCE_PROFILE (user-data-dir) and/or CDP_PROFILE_DIR (e.g. \"Profile 1\")" >&2
     exit 1
   fi
-  echo "re-seeding $DST from $SRC (caches excluded)…"
-  mkdir -p "$DST"
-  # Copy the primary profile + Local State, excluding cache-y dirs to stay lean.
-  # Singleton* lock files are excluded so they don't clash with the live instance.
-  rsync -a \
+  # Refuse to overwrite a live dedicated profile — the auto-start hook may have
+  # brought it up, and copying over an in-use profile dir corrupts it.
+  if is_up; then
+    echo "dedicated Chrome is running on :$PORT and is using $DST" >&2
+    echo "quit it first (close that Chrome window), then re-run: cdp-chrome reseed" >&2
+    exit 1
+  fi
+  echo "re-seeding $DST/$PROFILE_DIR from $SRC/$PROFILE_DIR (caches excluded, mirror)…"
+  mkdir -p "$DST/$PROFILE_DIR"
+  # --delete makes this a true fresh snapshot: files removed from the source
+  # (logged-out cookies, deleted extensions, reset site data) are removed from the
+  # copy too, so revoked session state can't linger. Cache-y dirs and Singleton*
+  # lock files are excluded.
+  rsync -a --delete \
     --exclude 'Cache/' --exclude 'Code Cache/' --exclude 'GPUCache/' \
     --exclude 'CacheStorage/' --exclude 'ScriptCache/' --exclude 'GrShaderCache/' \
     --exclude 'ShaderCache/' --exclude 'GraphiteDawnCache/' --exclude 'DawnGraphiteCache/' \
     --exclude 'DawnWebGPUCache/' --exclude 'component_crx_cache/' \
     --exclude 'optimization_guide_model_store/' --exclude 'Singleton*' \
-    "$SRC/Local State" "$SRC/Default" "$DST/" && echo "reseed done"
+    "$SRC/$PROFILE_DIR/" "$DST/$PROFILE_DIR/"
+  # Local State holds os_crypt metadata + profile registry; copy it alongside.
+  cp -f "$SRC/Local State" "$DST/Local State" 2>/dev/null || true
+  echo "reseed done"
 }
 
 config() {
