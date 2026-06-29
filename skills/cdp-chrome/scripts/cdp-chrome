@@ -62,7 +62,20 @@ profile_in_use() { pgrep -f -- "--user-data-dir=$DST" >/dev/null 2>&1; }
 seeded() { [ "$(cat "$MARKER" 2>/dev/null)" = "ok" ]; }
 
 start() {
-  if is_up; then echo "already up on :$PORT"; exit 0; fi
+  if is_up; then
+    # A DevTools endpoint answers on $PORT — but is it OURS? Confirm the LISTEN socket
+    # is held by a process running our --user-data-dir, so we don't silently bless an
+    # unrelated Chrome/CDP tool squatting on the port (which the MCP would then drive).
+    lp=$(lsof -ti "tcp:$PORT" -sTCP:LISTEN 2>/dev/null | head -1)
+    if [ -n "$lp" ] && pgrep -f -- "--user-data-dir=$DST" 2>/dev/null | grep -qw "$lp"; then
+      echo "already up on :$PORT"; exit 0
+    fi
+    echo "port $PORT already has a DevTools endpoint that is NOT the dedicated profile" >&2
+    echo "($DST). Another Chrome or CDP tool is holding it — pointing the MCP here would" >&2
+    echo "drive the wrong browser. Stop that listener (lsof -ti tcp:$PORT) or set a" >&2
+    echo "different CDP_PORT, then retry." >&2
+    exit 1
+  fi
   if ! seeded; then
     echo "no valid seeded profile at $DST (seed marker missing or incomplete)"
     echo "run:  cdp-chrome reseed   (quit your main Chrome first for a clean copy)"
