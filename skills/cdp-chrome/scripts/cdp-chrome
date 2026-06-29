@@ -68,14 +68,25 @@ start() {
     # unrelated Chrome/CDP tool squatting on the port (which the MCP would then drive).
     lp=$(lsof -ti "tcp:$PORT" -sTCP:LISTEN 2>/dev/null | head -1)
     if [ -n "$lp" ] && pgrep -f -- "--user-data-dir=$DST" 2>/dev/null | grep -qw "$lp"; then
-      # It's our profile dir — but is it the requested profile? If you switched
-      # CDP_PROFILE_DIR since it launched, "already up" would be a lie (wrong session).
-      if pgrep -f -- "--profile-directory=$PROFILE_DIR" 2>/dev/null | grep -qw "$lp"; then
-        echo "already up on :$PORT"; exit 0
+      # It's our profile dir — but do its LIVE launch flags match what's requested now?
+      # If you changed CDP_PROFILE_DIR or CDP_ALLOW_ORIGINS since it launched, "already
+      # up" would be a lie (wrong session / still-403'ing). Detect and refuse.
+      live=$(ps -ww -o command= -p "$lp" 2>/dev/null)
+      mismatch=""
+      pgrep -f -- "--profile-directory=$PROFILE_DIR" 2>/dev/null | grep -qw "$lp" \
+        || mismatch="profile (CDP_PROFILE_DIR=\"$PROFILE_DIR\")"
+      if [ -z "$mismatch" ] && [ -n "$live" ]; then
+        # grep -F: compare the flag as a literal string (handles "*" and URLs safely).
+        if [ -n "$ALLOW_ORIGINS" ]; then
+          printf '%s' "$live" | grep -qF -- "--remote-allow-origins=$ALLOW_ORIGINS" \
+            || mismatch="origin allowlist (CDP_ALLOW_ORIGINS)"
+        elif printf '%s' "$live" | grep -qF -- "--remote-allow-origins="; then
+          mismatch="origin allowlist (CDP_ALLOW_ORIGINS now unset, but it's running with one)"
+        fi
       fi
-      echo "already up on :$PORT, but with a different profile than CDP_PROFILE_DIR=\"$PROFILE_DIR\"." >&2
-      echo "Quit it and re-run to switch profiles (or to apply a changed CDP_ALLOW_ORIGINS):" >&2
-      echo "  lsof -ti tcp:$PORT | xargs kill" >&2
+      if [ -z "$mismatch" ]; then echo "already up on :$PORT"; exit 0; fi
+      echo "already up on :$PORT, but its launch flags differ from your request: $mismatch." >&2
+      echo "Quit it and re-run to apply the change:  lsof -ti tcp:$PORT | xargs kill" >&2
       exit 1
     fi
     echo "port $PORT already has a DevTools endpoint that is NOT the dedicated profile" >&2
