@@ -23,6 +23,8 @@ Iterate **without a fixed cap**. The loop exits only on the conditions in Phase 
 
 Invoke the `codex` skill against the current working state. Use the `Skill` tool with `skill: "codex"` and pass the scope as `args`.
 
+The `codex` skill delegates the actual run to a **Sonnet 5 watchdog sub-agent** (its Step 2.5) — it launches codex, babysits for hangs, recovers, and returns only the findings. That keeps the JSONL event stream out of this loop's context. **Phases B–C stay on you (the calling agent, Opus):** triaging which findings are real and applying fixes is judgment + code, not execution — never push it down to the runner. Each iteration uses a fresh runner for its one review run.
+
 Scope rules:
 - If the user passed a scope in `$ARGUMENTS`, forward it verbatim (e.g. `/codexloop staged changes` → `args: "review staged changes"`).
 - If `$ARGUMENTS` is empty, default to reviewing all uncommitted changes. Pass `args: "review my uncommitted changes"`.
@@ -120,7 +122,8 @@ The user wants to know what changed, what's still open, and why the loop stopped
 - **Don't commit or push** unless the user explicitly asked. The loop edits files in place and reports; commits are the user's call.
 - **Track disagreements across iterations.** Keep a running list of findings you've disagreed with, with reasons. This is what you feed back to codex in Phase A of later iterations, and what lets you detect the "stable impasse" exit condition.
 - **Stop early when it makes sense.** A short clean loop is better than 5 iterations of diminishing returns. Calling it done at iteration 2 with a good reason beats grinding through to iteration 5.
-- **If codex is unavailable** (not installed, network down, persistent errors), fall back to your own review pass, say so explicitly in the report, and let the user decide whether to retry.
+- **Hang recovery is the runner's job, not yours.** Because you invoke codex via the `Skill` tool, the codex skill's Sonnet watchdog (its Step 2.5) owns launch, hang-detection, the `TASK_ID`-scoped kill, and the one retry — those tasks live inside the runner, so do **not** run `pkill`/`TaskStop` yourself in delegated mode. You only react to the returned `STATUS` line: `COMPLETED`/`RECOVERED` → triage the findings; `FALLBACK` → triage the native-review body the runner returned; `FAILED` → treat codex as unavailable (next bullet). (Only in explicit inline mode do you apply the codex skill's recovery directly.)
+- **If codex is unavailable** (not installed, network down, persistent errors, or it hangs a second time after recovery), fall back to your own review pass (a fresh Opus reviewer over the same diff), say so explicitly in the report, and note the user can run codex interactively via `! codex …`.
 
 ## Note on the GitHub Codex bot (PR review workflow)
 
