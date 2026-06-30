@@ -75,7 +75,7 @@ You receive only that result text; run Step 4 / triage on it. The event stream n
    - Example: `TASK_ID=review_staged_20260513_143022` → `/tmp/codex_result_review_staged_20260513_143022.txt` and `/tmp/codex_events_review_staged_20260513_143022.jsonl`.
 5. **Run in the background with `--json` so every event streams as JSONL.** `-o` still captures the final message, but stdout is NOT redirected — it becomes the progress stream that Monitor can tail.
    ```bash
-   codex exec --json --sandbox read-only --skip-git-repo-check -c model_reasoning_effort=high -c service_tier="fast" --cd <project_directory> -o /tmp/codex_result_<TASK_ID>.txt "<constructed_prompt>" </dev/null
+   codex exec --json --sandbox read-only --skip-git-repo-check -c model_reasoning_effort=xhigh -c service_tier="fast" --cd <project_directory> -o /tmp/codex_result_<TASK_ID>.txt "<constructed_prompt>" </dev/null
    ```
    - **NEVER pass `--full-auto`** — it's deprecated in codex >=0.130 and the combination `--json + --full-auto` reliably hangs codex at "Reading additional input from stdin..." with zero JSONL events emitted (observed 35+ minute hangs). Codex's sandbox is already constrained by `--sandbox read-only`, so `--full-auto` adds nothing here.
    - **Always close stdin with `</dev/null`** — without it, codex sits on its stdin reader and may stall indefinitely when stdout is piped through `tee` or another consumer. Closing stdin is a no-op when codex doesn't need it and prevents the hang when it does.
@@ -201,7 +201,7 @@ The cardinal rule: a hung codex must never silently block the task. Detect → k
 | `--skip-git-repo-check` | (flag) | Skip the git-repo guard so codex runs from any working directory |
 | `</dev/null` (stdin) | shell redirect | Close stdin — required to prevent "Reading additional input from stdin..." hang |
 | ~~`--full-auto`~~ | DO NOT USE | Deprecated in codex 0.130+; combined with `--json` it hangs the process. `--sandbox read-only` already gives the non-interactive behavior we want. |
-| `-c model_reasoning_effort` | `high` | Reasoning effort — fast mode speeds up tokens, not thinking |
+| `-c model_reasoning_effort` | `xhigh` | Keep reasoning effort maxed out — fast mode speeds up tokens, not thinking |
 | `-c service_tier` | `"fast"` | **Always enable Codex fast mode** — lower latency service tier, no quality downgrade |
 | `--cd` | project directory | Target directory for analysis |
 | `-o` | file path | Capture the final agent message so we can read it after completion |
@@ -209,7 +209,7 @@ The cardinal rule: a hung codex must never silently block the task. Detect → k
 ## Important Rules
 
 - Always use `--sandbox read-only` — Codex must never modify the codebase.
-- **Always pass `-c service_tier="fast"`** to force Codex fast mode (lower-latency service tier). Never drop reasoning effort below `high` to "go faster" — use fast mode instead.
+- **Always pass `-c service_tier="fast"`** to force Codex fast mode (lower-latency service tier). Never drop reasoning effort below `xhigh` to "go faster" — use fast mode instead.
 - If `$ARGUMENTS` is empty or only contains "review" with no further description, **default to reviewing all uncommitted changes** (run `git diff` + `git diff --staged` to gather context).
 - **Always run in background with `--json` + `Monitor` streaming** so the user can see codex's activity in real time instead of staring at a silent process. Never redirect stdout to `/dev/null`.
 - **Always use `run_in_background: true`** on the Bash tool call so the user isn't blocked while Codex works. When the completion notification arrives, read `/tmp/codex_result_<TASK_ID>.txt` for the final answer and summarize it.
