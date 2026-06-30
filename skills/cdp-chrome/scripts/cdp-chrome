@@ -1,0 +1,178 @@
+#!/usr/bin/env bash
+#
+# cdp-chrome — run a dedicated, logged-in Chrome that CDP clients can attach to
+#              unattended (no "Allow remote debugging?" dialog) on Chrome 136+.
+#
+# WHY THIS EXISTS
+#   Chrome 136+ silently ignores --remote-debugging-port on the DEFAULT profile
+#   (anti-cookie-theft hardening). chrome-devtools-mcp --autoConnect attaches to
+#   your running Chrome and triggers a per-session native consent dialog that no
+#   automation can click. The fix: keep a SEPARATE Chrome instance, launched from
+#   a NON-default user-data-dir that is a COPY of your real profile. On macOS the
+#   Keychain "Chrome Safe Storage" key is per-user (not bound to the profile path),
+#   so the copied cookies still decrypt → the dedicated instance is logged in, and
+#   because you opened the port yourself there is no dialog. Point your CDP client
+#   at  --browserUrl http://127.0.0.1:<PORT>.
+#
+# PLATFORM: macOS (the Keychain-decrypts-a-copied-profile behavior is macOS-specific;
+#   on Linux/Windows the cookie-encryption key binding differs — see SKILL.md).
+#
+# USAGE
+#   cdp-chrome start     # bring the dedicated Chrome up on :PORT (idempotent)
+#   cdp-chrome reseed    # refresh the copied profile from your real one (logins)
+#   cdp-chrome status    # up / down
+#   cdp-chrome config    # print the chrome-devtools-mcp args to use
+#
+# ENV OVERRIDES (defaults shown)
+#   CDP_PORT=9222
+#   CDP_PROFILE="$HOME/.cache/cdp-mcp-profile"      # the dedicated (copied) user-data-dir
+#   CDP_SOURCE_PROFILE="$HOME/Library/Application Support/Google/Chrome"  # your real user-data-dir
+#   CDP_PROFILE_DIR="Default"                        # which profile inside it (e.g. "Profile 1")
+#   CDP_CHROME="/Applications/Google Chrome.app"     # the .app BUNDLE (passed to open -a)
+#   CDP_ALLOW_ORIGINS=""   (UNSET = no --remote-allow-origins flag; see SECURITY in SKILL.md)
+#
+# SECURITY DEFAULT: CDP_ALLOW_ORIGINS is UNSET by default, so --remote-allow-origins is
+#   NOT passed. Chrome then accepts only CDP websocket connections with no Origin header
+#   (puppeteer / chrome-devtools-mcp / Playwright) and REJECTS origin-bearing connections
+#   from web pages — a local page can't hijack the logged-in browser. Set it explicitly
+#   (e.g. CDP_ALLOW_ORIGINS="*" or a specific origin) only if your client sends an Origin.
+#
+set -u
+
+PORT="${CDP_PORT:-9222}"
+DST="${CDP_PROFILE:-$HOME/.cache/cdp-mcp-profile}"
+SRC="${CDP_SOURCE_PROFILE:-$HOME/Library/Application Support/Google/Chrome}"
+PROFILE_DIR="${CDP_PROFILE_DIR:-Default}"
+CHROME="${CDP_CHROME:-/Applications/Google Chrome.app}"   # .app bundle for open -a
+ALLOW_ORIGINS="${CDP_ALLOW_ORIGINS-}"   # unset → empty → flag omitted (secure default)
+MARKER="$DST/.cdp-seeded-$PROFILE_DIR"  # per-profile; written "ok" only after a complete reseed
+
+# A real CDP endpoint returns JSON containing webSocketDebuggerUrl. Use -f so HTTP
+# 4xx/5xx from some *other* service squatting on the port counts as "down", and
+# grep the payload so only a genuine DevTools endpoint counts as "up".
+is_up() {
+  curl -fsS --max-time 2 "http://127.0.0.1:$PORT/json/version" 2>/dev/null \
+    | grep -q "webSocketDebuggerUrl"
+}
+
+# True if any Chrome is currently running against the dedicated profile dir, on ANY
+# port — more reliable than the port check for "is it safe to overwrite the profile".
+profile_in_use() { pgrep -f -- "--user-data-dir=$DST" >/dev/null 2>&1; }
+
+seeded() { [ "$(cat "$MARKER" 2>/dev/null)" = "ok" ]; }
+
+start() {
+  if is_up; then
+    # A DevTools endpoint answers on $PORT — but is it OURS? Confirm the LISTEN socket
+    # is held by a process running our --user-data-dir, so we don't silently bless an
+    # unrelated Chrome/CDP tool squatting on the port (which the MCP would then drive).
+    lp=$(lsof -ti "tcp:$PORT" -sTCP:LISTEN 2>/dev/null | head -1)
+    if [ -n "$lp" ] && pgrep -f -- "--user-data-dir=$DST" 2>/dev/null | grep -qw "$lp"; then
+      # It's our profile dir — but do its LIVE launch flags match what's requested now?
+      # If you changed CDP_PROFILE_DIR or CDP_ALLOW_ORIGINS since it launched, "already
+      # up" would be a lie (wrong session / still-403'ing). Detect and refuse.
+      live=$(ps -ww -o command= -p "$lp" 2>/dev/null)
+      mismatch=""
+      pgrep -f -- "--profile-directory=$PROFILE_DIR" 2>/dev/null | grep -qw "$lp" \
+        || mismatch="profile (CDP_PROFILE_DIR=\"$PROFILE_DIR\")"
+      if [ -z "$mismatch" ] && [ -n "$live" ]; then
+        # grep -F: compare the flag as a literal string (handles "*" and URLs safely).
+        if [ -n "$ALLOW_ORIGINS" ]; then
+          printf '%s' "$live" | grep -qF -- "--remote-allow-origins=$ALLOW_ORIGINS" \
+            || mismatch="origin allowlist (CDP_ALLOW_ORIGINS)"
+        elif printf '%s' "$live" | grep -qF -- "--remote-allow-origins="; then
+          mismatch="origin allowlist (CDP_ALLOW_ORIGINS now unset, but it's running with one)"
+        fi
+      fi
+      if [ -z "$mismatch" ]; then echo "already up on :$PORT"; exit 0; fi
+      echo "already up on :$PORT, but its launch flags differ from your request: $mismatch." >&2
+      echo "Quit it and re-run to apply the change:  lsof -ti tcp:$PORT | xargs kill" >&2
+      exit 1
+    fi
+    echo "port $PORT already has a DevTools endpoint that is NOT the dedicated profile" >&2
+    echo "($DST). Another Chrome or CDP tool is holding it — pointing the MCP here would" >&2
+    echo "drive the wrong browser. Stop that listener (lsof -ti tcp:$PORT) or set a" >&2
+    echo "different CDP_PORT, then retry." >&2
+    exit 1
+  fi
+  if ! seeded; then
+    echo "no valid seeded profile at $DST (seed marker missing or incomplete)"
+    echo "run:  cdp-chrome reseed   (quit your main Chrome first for a clean copy)"
+    exit 1
+  fi
+  # open -na launches a NEW instance even while your main Chrome is running. CHROME is
+  # the .app BUNDLE path (open -a's selector). --remote-allow-origins is added ONLY when
+  # CDP_ALLOW_ORIGINS is set (secure default: omitted). Quoted so the shell never globs "*".
+  local args=(
+    --remote-debugging-port="$PORT"
+    --user-data-dir="$DST"
+    --profile-directory="$PROFILE_DIR"
+    --no-first-run --no-default-browser-check
+  )
+  [ -n "$ALLOW_ORIGINS" ] && args+=( --remote-allow-origins="$ALLOW_ORIGINS" )
+  open -na "$CHROME" --args "${args[@]}" about:blank
+  for _ in $(seq 1 20); do is_up && { echo "up on :$PORT"; exit 0; }; sleep 1; done
+  echo "failed to come up on :$PORT"; exit 1
+}
+
+reseed() {
+  if [ ! -d "$SRC/$PROFILE_DIR" ]; then
+    echo "source profile not found: $SRC/$PROFILE_DIR" >&2
+    echo "set CDP_SOURCE_PROFILE (user-data-dir) and/or CDP_PROFILE_DIR (e.g. \"Profile 1\")" >&2
+    exit 1
+  fi
+  # Refuse if the dedicated profile is live (on ANY port) — copying over an in-use
+  # profile dir corrupts it. Checks the process's --user-data-dir, not just the port.
+  if profile_in_use; then
+    echo "a Chrome is running against $DST (the dedicated profile)" >&2
+    echo "quit that instance first, then re-run: cdp-chrome reseed" >&2
+    exit 1
+  fi
+  mkdir -p "$DST/$PROFILE_DIR"
+  printf 'in-progress\n' > "$MARKER"   # invalidate the marker until this reseed completes
+  echo "re-seeding $DST/$PROFILE_DIR from $SRC/$PROFILE_DIR (caches excluded, mirror)…"
+  # --delete makes this a true fresh snapshot: files removed from the source
+  # (logged-out cookies, deleted extensions, reset site data) are removed from the
+  # copy too. Cache-y dirs and Singleton* lock files are excluded.
+  rsync -a --delete \
+    --exclude 'Cache/' --exclude 'Code Cache/' --exclude 'GPUCache/' \
+    --exclude 'CacheStorage/' --exclude 'ScriptCache/' --exclude 'GrShaderCache/' \
+    --exclude 'ShaderCache/' --exclude 'GraphiteDawnCache/' --exclude 'DawnGraphiteCache/' \
+    --exclude 'DawnWebGPUCache/' --exclude 'component_crx_cache/' \
+    --exclude 'optimization_guide_model_store/' --exclude 'Singleton*' \
+    "$SRC/$PROFILE_DIR/" "$DST/$PROFILE_DIR/" || {
+      echo "reseed FAILED: rsync error — the profile copy is incomplete and was NOT" >&2
+      echo "marked seeded (marker left 'in-progress'); 'start' will refuse it. Fix the" >&2
+      echo "cause (disk space, permissions, quit source Chrome) and re-run." >&2
+      exit 1
+    }
+  # Local State holds os_crypt metadata + profile registry; it must copy too, or the
+  # snapshot is inconsistent — propagate failure instead of marking seeded.
+  if [ -f "$SRC/Local State" ] && ! cp -f "$SRC/Local State" "$DST/Local State"; then
+    echo "reseed FAILED: could not copy 'Local State' (disk/permissions) — NOT marked" >&2
+    echo "seeded; start will refuse it. Fix the cause and re-run." >&2
+    exit 1
+  fi
+  printf 'ok\n' > "$MARKER"            # mark seeded only after a complete copy
+  echo "reseed done"
+}
+
+config() {
+  cat <<EOF
+Point your CDP client at the dedicated instance. For chrome-devtools-mcp, set its
+args (e.g. in ~/.claude.json under mcpServers.chrome-devtools.args):
+
+  ["chrome-devtools-mcp@latest", "--browserUrl", "http://127.0.0.1:$PORT"]
+
+(Replace any "--autoConnect" arg. Restart the MCP host for it to take effect.)
+EOF
+}
+
+case "${1:-start}" in
+  start)  start ;;
+  reseed) reseed ;;
+  status) is_up && echo "up on :$PORT" || echo "down" ;;
+  config) config ;;
+  -h|--help|help) sed -n '2,40p' "$0" ;;
+  *) echo "usage: cdp-chrome {start|reseed|status|config}"; exit 2 ;;
+esac
