@@ -11,14 +11,17 @@ not raw files. Keep this compact — a page or two, not a file dump.
 **Repo(s) / subsystem:** …
 **The decision the frontier model is here to make:** … (mirror the session brief)
 
-## Current shape (with file:line)
-> Pull from a call-graph tool if available (trace references, symbol search,
-> architecture summary); otherwise have an excavator agent read and cite
-> directly. Cite exact symbols and locations — precision beats volume.
+## Current shape (with precise citations)
+> For code: pull from a call-graph tool if available (trace references, symbol
+> search, architecture summary), otherwise have an excavator agent read and
+> cite directly — cite exact symbols and locations. For a non-code artifact,
+> cite the authoritative sources instead (the current spec/doc, the existing
+> taxonomy, the prior decision record) with section/heading precision. Either
+> way, precision beats volume.
 
-- Current contract/interface: `path/file.rs:NN` — …
-- Key call sites / consumers: `path/file.go:NN` — …
-- Relevant data model / wire format: `path/file:NN` — …
+- Current contract / interface / spec: `path/file.rs:NN` or `doc.md#section` — …
+- Key consumers / who builds on it: `path/file.go:NN` — …
+- Relevant data model / wire format / structure: `path/file:NN` — …
 
 ## Invariants that must hold
 > What cannot break: wire-compat, byte-parity goldens, security guards, ordering.

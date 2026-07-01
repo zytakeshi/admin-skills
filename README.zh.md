@@ -20,7 +20,7 @@
 - **`/finish-translation`** — 自动检测项目的 i18n 框架（ARB、JSON/i18next、.strings、.xcstrings、gettext、YAML/Rails、Android XML、.resx），并执行翻译传播、审计或硬编码字符串扫描。
 - **`/ask-grok`** — 用你现有的 X Premium / SuperGrok 订阅（无需 API key）向 Grok（xAI）查询实时 Web 和 X/Twitter 信息。把「最新进展」「突发新闻」「工具最新版本」「X 上大家在聊什么」经官方 Grok CLI 路由给 Grok，并把回答连同来源链接原样展示。
 - **`/cdp-chrome`** — 在 Chrome 136+ 上让 Chrome DevTools（CDP）浏览器自动化**无人值守**运行：连接到一个专用的、已登录的 Chrome 实例（用 `--browserUrl`），从而再也不会弹出「Allow remote debugging?」原生授权框，`chrome-devtools-mcp` / Puppeteer / Playwright 也不再卡在连接处。附带 `cdp-chrome` 辅助脚本（start / reseed / status / config）。仅 macOS。
-- **`/fable5`** — 如何用好一次前沿级模型会话（例如 Claude 的 Fable 5）的指南：判断某项工作是否值得动用前沿级（是否是"单向门"——反悔成本很高的决定），先压缩上下文，再让前沿模型写出治理性产物（PRD、API 契约、数据模型、验证 rubric），然后把实现和验证交给你的廉价机队（有 `/codex` + `/codexloop` 就用它们，没有就用等效工具）。
+- **`/fable5`** — 如何用好一次前沿级模型会话（例如 Claude 的 Fable 5）的指南：判断某项工作是否值得动用前沿级（是否是"单向门"——反悔成本很高的决定），先压缩上下文，再让前沿模型写出那一个治理性产物——下游工作最依赖的、耐久的决定/规格/框架（可以是数据模型或 API 契约，也同样可以是 PRD、评审 rubric、分类体系、研究计划或策略），然后把实现和验证交给你的廉价机队（有 `/codex` + `/codexloop` 就用它们，没有就用等效工具）。
 
 > **注意（2026年3月31日起）：** Codex 代码审查现已计入常规 Codex 使用额度，不再享有独立配额。频繁使用代码审查可能会更快达到 Codex 整体限额。详见 [OpenAI 公告](https://chatgpt.com/codex)。
 

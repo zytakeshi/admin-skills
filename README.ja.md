@@ -20,7 +20,7 @@ Claude Code 向けのシステム管理・DevOps スキル集です。デプロ�
 - **`/finish-translation`** — プロジェクトの i18n フレームワーク（ARB・JSON/i18next・.strings・.xcstrings・gettext・YAML/Rails・Android XML・.resx）を自動検出し、翻訳の伝播・監査・ハードコード文字列検出を実行。
 - **`/ask-grok`** — 既存の X Premium / SuperGrok サブスクリプション（APIキー不要）で Grok（xAI）にリアルタイムの Web・X/Twitter 情報を照会。「最新の〜は？」「速報」「ツールの最新バージョン」「Xで〜について何と言われている？」を公式 Grok CLI 経由で Grok にルーティングし、回答をソースリンク付きでそのまま表示。
 - **`/cdp-chrome`** — Chrome 136+ で Chrome DevTools（CDP）ブラウザ自動化を**無人で**実行。専用のログイン済み Chrome インスタンスに `--browserUrl` で接続するため、「Allow remote debugging?」のネイティブ許可ダイアログが一切出ず、`chrome-devtools-mcp` / Puppeteer / Playwright が接続時にハングしなくなる。`cdp-chrome` ヘルパー（start / reseed / status / config）を同梱。macOS。
-- **`/fable5`** — フロンティア級モデル（Claude の Fable 5 など）のセッションを有効に使うためのガイド。ある作業が "one-way door"（後戻りにコストがかかる決定）としてフロンティア級を使う価値があるか判断し、セッション前にコンテキストを圧縮し、フロンティアモデルに統治アーティファクト（PRD・API契約・データモデル・検証ルーブリック）を書かせてから、実装と検証を安価なフリート（`/codex` + `/codexloop` があればそれと、なければ同等のツールと）に引き継ぐ。
+- **`/fable5`** — フロンティア級モデル（Claude の Fable 5 など）のセッションを有効に使うためのガイド。ある作業が "one-way door"（後戻りにコストがかかる決定）としてフロンティア級を使う価値があるか判断し、セッション前にコンテキストを圧縮し、フロンティアモデルに唯一の統治アーティファクト——下流の作業が最も依存する耐久的な決定・仕様・枠組み（データモデルやAPI契約はもちろん、PRD・検証ルーブリック・分類体系・リサーチ計画・ポリシーなども）——を書かせてから、実装と検証を安価なフリート（`/codex` + `/codexloop` があればそれと、なければ同等のツールと）に引き継ぐ。
 
 > **注意（2026年3月31日）:** Codex コードレビューは専用枠ではなく、通常の Codex 使用量にカウントされるようになりました。コードレビューを多用すると、Codex の全体制限に早く達する場合があります。詳細は [OpenAI の告知](https://chatgpt.com/codex)を参照してください。
 

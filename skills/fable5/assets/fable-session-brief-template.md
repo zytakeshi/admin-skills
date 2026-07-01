@@ -7,8 +7,10 @@ distilled context pack.
 ---
 
 ## Target artifact
-> One of: PRD/architecture doc · API-or-wire contract · data model/schema ·
-> verification rubric + verdict schema · fleet system-prompt.
+> Whichever fits — the durable decision the most downstream work depends on:
+> spec/PRD/architecture doc · API-or-wire contract · data model/schema ·
+> verification rubric + verdict schema · taxonomy/information architecture ·
+> research plan · policy/decision record · fleet system-prompt.
 
 **Artifact type:** …
 **One-sentence goal of this artifact:** …
@@ -28,7 +30,9 @@ distilled context pack.
 2. …
 
 ## Constraints & invariants that must hold
-> Wire-compat, byte-parity, existing contracts, security guards, platform limits.
+> What cannot break: wire-compat / byte-parity / existing contracts / security
+> guards / platform limits for code; or the fixed facts, prior decisions, brand
+> rules, and scope boundaries for a non-code artifact.
 
 - …
 
