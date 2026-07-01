@@ -20,7 +20,7 @@ A collection of sysadmin and DevOps skills for Claude Code. Automate deployments
 - **`/finish-translation`** — Auto-detect your project's i18n framework (ARB, JSON/i18next, .strings, .xcstrings, gettext, YAML/Rails, Android XML, .resx) and propagate, audit, or scan for hardcoded strings.
 - **`/ask-grok`** — Consult Grok (xAI) for real-time web and X/Twitter knowledge using your existing X Premium / SuperGrok subscription (no API key). Routes "what's the latest on…", breaking news, newest tool versions, and "what are people saying on X about…" to Grok via the official Grok CLI, then shows the answer verbatim with its source links.
 - **`/cdp-chrome`** — Run Chrome DevTools (CDP) browser automation **unattended** on Chrome 136+ by attaching to a dedicated, already-logged-in Chrome instance via `--browserUrl` — so the native "Allow remote debugging?" consent dialog never appears and `chrome-devtools-mcp` / Puppeteer / Playwright stop hanging on connect. Bundles a `cdp-chrome` helper (start / reseed / status / config). macOS.
-- **`/fable5`** — Guide for spending a frontier-tier model session (e.g. Claude's Fable 5) well: decide if work is a "one-way door" worth the frontier tier, compress context first, have the frontier model write the governing artifact (PRD / contract / data model / rubric), then hand off implementation to `/codex` and verification to `/codexloop`.
+- **`/fable5`** — Guide for spending a frontier-tier model session (e.g. Claude's Fable 5) well: decide if work is a "one-way door" worth the frontier tier, compress context first, have the frontier model write the governing artifact (PRD / contract / data model / rubric), then hand off implementation and verification to your cheap fleet (pairs well with `/codex` + `/codexloop` if you have them installed, but works with any implementation/review tooling).
 
 > **Note (March 31, 2026):** Codex Code Review now counts toward your regular Codex usage limit instead of having a separate allowance. Heavy Code Review usage may cause you to reach your overall Codex limit sooner. See [OpenAI's announcement](https://chatgpt.com/codex) for details.
 
@@ -66,7 +66,7 @@ npx skills add zytakeshi/admin-skills@fable5
 | [finish-translation](skills/finish-translation/) | Auto-detect your i18n framework and propagate / audit / scan for hardcoded strings across all locales |
 | [ask-grok](skills/ask-grok/) | Consult Grok (xAI) for real-time web + X/Twitter knowledge via the official Grok CLI (subscription OAuth, no API key) — latest releases, breaking news, social pulse, answers shown verbatim with source links |
 | [cdp-chrome](skills/cdp-chrome/) | Run Chrome DevTools (CDP) automation unattended on Chrome 136+ — attach to a dedicated, logged-in Chrome via `--browserUrl` so the "Allow remote debugging?" dialog never appears; bundles a `cdp-chrome` helper (start / reseed / status / config). macOS |
-| [fable5](skills/fable5/) | Guide for spending a frontier-tier model session well — one-way-door test, context-pack compression, spawn-as-sub-agent-then-return pattern, handoff to `/codex` + `/codexloop` |
+| [fable5](skills/fable5/) | Guide for spending a frontier-tier model session well — one-way-door test, context-pack compression, spawn-as-sub-agent-then-return pattern, handoff to your cheap fleet (pairs with `/codex` + `/codexloop`, or any equivalent) |
 
 ## Usage
 
@@ -85,7 +85,7 @@ After installing, use the skills in Claude Code:
 - `/finish-translation` — sync / audit translations across all locales
 - `/ask-grok` — get live web / X answers from Grok, shown verbatim with sources
 - `/cdp-chrome` — set up unattended Chrome DevTools automation (dedicated logged-in Chrome, no permission dialog)
-- `/fable5` — decide whether work is worth a frontier-tier model session, and how to spend it well
+- `/fable5` — decide whether work is worth a frontier-tier model session, spend it well, and hand off to your cheap fleet
 
 ## See Also
 

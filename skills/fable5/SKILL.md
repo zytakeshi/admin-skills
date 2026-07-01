@@ -7,9 +7,11 @@ description: >-
   session, have the frontier model write the governing artifact (PRD /
   API-or-wire contract / data model / verification rubric / fleet
   system-prompt) as a mid-flight sub-agent spawn, then return control to your
-  main-loop model, which hands off implementation to the /codex skill and
-  verification to /codexloop, escalating back to the main loop only on real
-  ambiguity. Use this WHENEVER the user mentions Fable 5 or a frontier model
+  main-loop model, which hands off implementation and verification to your
+  cheap fleet (an implementation pass plus a review-and-fix loop — this
+  collection's own /codex + /codexloop skills, or whatever equivalent
+  tooling you use), escalating back to the main loop only on real ambiguity.
+  Use this WHENEVER the user mentions Fable 5 or a frontier model
   tier, asks "should I use the frontier model or my main model (or a cheap
   model) for this," wants to plan/architect a one-way-door decision, asks what
   to spend an expensive frontier session on, is prepping a frontier-model
@@ -48,8 +50,10 @@ coordination, and synthesis inside that one call: it writes the PRD / contract
 / schema / rubric. It does **not** write implementation, edit files, or do
 code review, and it never holds the session past that call. Every
 implementation/review step goes to your main model (judgment) or the cheap
-fleet (execution) — concretely, the `/codex` skill in this collection (see
-Step 4), not any other review tool.
+fleet (execution) — concretely, this collection's own `/codex` skill for
+implementation and `/codexloop` for verification (see Steps 4-5), if you have
+them installed, or whatever equivalent implementation/review-loop tooling you
+already use.
 
 ## The three tiers
 
@@ -62,8 +66,8 @@ TIER-0  FRONTIER   one-way doors + governing artifacts        run rarely · amor
 TIER-1  MAIN MODEL  orchestration + genuinely-novel judgment    SHRINKS as judgment
                     (the call not yet codified in an artifact)  moves up into Tier-0
 ─────────────────────────────────────────────────────────────────────────────────
-TIER-2  CHEAP       compressor (repo→distilled pack) · impl     runs all week
-        FLEET       via /codex skill · codexloop verify ·
+TIER-2  CHEAP       compressor (repo→distilled pack) · impl +   runs all week
+        FLEET       review-loop (yours, e.g. /codex + /codexloop) ·
                      i18n · search · mechanical transforms
 ```
 
@@ -91,8 +95,8 @@ structure others build on*:
 Route to the **cheap fleet** when the work is *cheap to reverse or
 mechanical*: release engineering (tag → bump → deploy), i18n propagation,
 per-fork ports, boilerplate, searches, log/metric scans, and — importantly —
-**the reviews themselves** (codexloop runs on the cheap fleet against the
-frontier model's rubric).
+**the reviews themselves** (your review loop, e.g. `/codexloop`, runs on the
+cheap fleet against the frontier model's rubric).
 
 If you're unsure, apply the metaphor: **a revolving door (walk back out
 freely) → cheap fleet. A door that locks behind you → frontier tier.**
@@ -159,26 +163,28 @@ comes up. The artifact should be self-contained enough that your main model or
 the cheap fleet can implement/run against it without re-consulting the
 frontier model.
 
-## Step 4 — Implement via the cheap fleet (`/codex`)
+## Step 4 — Implement via the cheap fleet
 
-Back on your main model: hand the frontier model's PRD/contract to the
-**`/codex` skill** — or a cheap-fleet implementation agent — to write the code
-**against the artifact**. The design decisions are already made; this is
-execution. Keep the diff minimal and traceable to the PRD.
+Back on your main model: hand the frontier model's PRD/contract to a
+cheap-fleet implementation agent — this collection's own `/codex` skill if
+you have it installed, or any equivalent implementation tooling — to write
+the code **against the artifact**. The design decisions are already made;
+this is execution. Keep the diff minimal and traceable to the PRD.
 
-## Step 5 — Verify via codexloop (against the frontier model's rubric)
+## Step 5 — Verify via a cheap-fleet review loop (against the frontier model's rubric)
 
-Run `/codexloop` (cheap fleet) to review-and-iterate. Because the frontier
-model already wrote the grading rubric and verdict schema in Step 3, the loop
-grades against a frozen, high-quality standard instead of re-inventing
-criteria each run. This is exactly the "one frontier session shapes thousands
-of downstream calls" payoff.
+Run a cheap-fleet review-and-fix loop — this collection's own `/codexloop`
+if installed, or your own equivalent — to review-and-iterate. Because the
+frontier model already wrote the grading rubric and verdict schema in Step 3,
+the loop grades against a frozen, high-quality standard instead of
+re-inventing criteria each run. This is exactly the "one frontier session
+shapes thousands of downstream calls" payoff.
 
 ## Step 6 — Escalate to your main model only on a real ambiguity
 
-The cheap fleet (`/codex` + codexloop) runs the loop autonomously. Your main
-model (the orchestrator, already the main loop throughout Steps 4-6) steps in
-**only** when the loop surfaces a genuine ambiguity or design gap the artifact
+The cheap fleet (implementation + review loop) runs the loop autonomously.
+Your main model (the orchestrator, already the main loop throughout Steps
+4-6) steps in **only** when the loop surfaces a genuine ambiguity or design gap the artifact
 didn't cover — not for routine execution. If that ambiguity is itself a
 reusable judgment call your main model would otherwise re-derive every time,
 that's the signal to go back to Step 3 and spawn the frontier model again to

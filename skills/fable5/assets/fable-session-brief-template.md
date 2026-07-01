@@ -44,7 +44,7 @@ distilled context pack.
 
 - [ ] The frozen shape/contract/rubric is fully specified.
 - [ ] The hard trade-offs are resolved with reasoning, not left open.
-- [ ] A cheap-fleet agent (e.g. `/codex` / `/codexloop`) can act on it directly.
+- [ ] A cheap-fleet agent (e.g. `/codex` / `/codexloop`, or your own equivalent) can act on it directly.
 
 ## Attached
 - Distilled context pack (see `context-pack-template.md`) — NOT raw repo reads.

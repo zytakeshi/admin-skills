@@ -24,8 +24,9 @@ These are cheap-to-reverse or mechanical — route to the cheap fleet instead:
 - i18n extraction / translation propagation.
 - Per-fork ports of an already-decided change.
 - Boilerplate scaffolding, searches, log/metric scans.
-- **The code reviews themselves** — codexloop runs on the cheap fleet against
-  the frontier-written rubric (pattern #1), not on the frontier model.
+- **The code reviews themselves** — your review loop (e.g. `/codexloop`) runs
+  on the cheap fleet against the frontier-written rubric (pattern #1), not on
+  the frontier model.
 
 ## How to build your own ranked shortlist
 
