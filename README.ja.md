@@ -20,6 +20,7 @@ Claude Code 向けのシステム管理・DevOps スキル集です。デプロ�
 - **`/finish-translation`** — プロジェクトの i18n フレームワーク（ARB・JSON/i18next・.strings・.xcstrings・gettext・YAML/Rails・Android XML・.resx）を自動検出し、翻訳の伝播・監査・ハードコード文字列検出を実行。
 - **`/ask-grok`** — 既存の X Premium / SuperGrok サブスクリプション（APIキー不要）で Grok（xAI）にリアルタイムの Web・X/Twitter 情報を照会。「最新の〜は？」「速報」「ツールの最新バージョン」「Xで〜について何と言われている？」を公式 Grok CLI 経由で Grok にルーティングし、回答をソースリンク付きでそのまま表示。
 - **`/cdp-chrome`** — Chrome 136+ で Chrome DevTools（CDP）ブラウザ自動化を**無人で**実行。専用のログイン済み Chrome インスタンスに `--browserUrl` で接続するため、「Allow remote debugging?」のネイティブ許可ダイアログが一切出ず、`chrome-devtools-mcp` / Puppeteer / Playwright が接続時にハングしなくなる。`cdp-chrome` ヘルパー（start / reseed / status / config）を同梱。macOS。
+- **`/fable5`** — フロンティア級モデル（Claude の Fable 5 など）のセッションを有効に使うためのガイド。ある作業が "one-way door"（後戻りにコストがかかる決定）としてフロンティア級を使う価値があるか判断し、セッション前にコンテキストを圧縮し、フロンティアモデルに統治アーティファクト（PRD・API契約・データモデル・検証ルーブリック）を書かせてから、実装を `/codex`、検証を `/codexloop` に引き継ぐ。
 
 > **注意（2026年3月31日）:** Codex コードレビューは専用枠ではなく、通常の Codex 使用量にカウントされるようになりました。コードレビューを多用すると、Codex の全体制限に早く達する場合があります。詳細は [OpenAI の告知](https://chatgpt.com/codex)を参照してください。
 
@@ -44,6 +45,7 @@ npx skills add zytakeshi/admin-skills@team
 npx skills add zytakeshi/admin-skills@finish-translation
 npx skills add zytakeshi/admin-skills@ask-grok
 npx skills add zytakeshi/admin-skills@cdp-chrome
+npx skills add zytakeshi/admin-skills@fable5
 ```
 
 ## 利用可能なスキル
@@ -62,6 +64,7 @@ npx skills add zytakeshi/admin-skills@cdp-chrome
 | [finish-translation](skills/finish-translation/) | i18n フレームワークを自動検出し、全ロケールへの翻訳伝播・監査・ハードコード文字列検出を実行 |
 | [ask-grok](skills/ask-grok/) | 公式 Grok CLI（サブスク OAuth、APIキー不要）で Grok（xAI）にリアルタイム Web・X/Twitter 情報を照会 — 最新リリース、速報、Xの反応を、ソースリンク付きでそのまま表示 |
 | [cdp-chrome](skills/cdp-chrome/) | Chrome 136+ で Chrome DevTools（CDP）自動化を無人実行 — `--browserUrl` で専用のログイン済み Chrome に接続し、「Allow remote debugging?」ダイアログを根絶。`cdp-chrome` ヘルパー（start / reseed / status / config）同梱。macOS |
+| [fable5](skills/fable5/) | フロンティア級モデルのセッションを有効に使うためのガイド — one-way-door 判定、コンテキストパック圧縮、サブエージェントとして呼び出して戻す運用、`/codex` + `/codexloop` への引き継ぎ |
 
 ## 使い方
 
@@ -79,6 +82,7 @@ npx skills add zytakeshi/admin-skills@cdp-chrome
 - `/finish-translation` — 全ロケールの翻訳を同期 / 監査
 - `/ask-grok` — Grok からライブ Web・X 情報を取得し、ソース付きでそのまま表示
 - `/cdp-chrome` — 無人の Chrome DevTools 自動化をセットアップ（専用のログイン済み Chrome、許可ダイアログなし）
+- `/fable5` — その作業がフロンティア級モデルのセッションに値するか判断し、有効に使う
 
 ## 関連プロジェクト
 
