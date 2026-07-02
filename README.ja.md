@@ -11,7 +11,7 @@ Claude Code 向けのシステム管理・DevOps スキル集です。デプロ�
 - **`/deploy`** — バックアップ必須のゼロダウンタイムデプロイ。差分検出と自動キャッシュクリア付き。ロールバック忘れの心配なし。
 - **`/commit-push`** — diff を分析して conventional commit メッセージを生成し、安全にプッシュ。「fix stuff」コミットとはお別れ。
 - **`/create-pr`** — PR を作成し、[OpenAI Codex](https://chatgpt.com/codex) が自動レビュー。レビュー完了後、Claude がフィードバックを読み取り、同意した指摘を修正してプッシュし、マージを提案 — エンドツーエンドで完全自動化。
-- **`/html-specialist`** — コンセプト、システム、データ、プロダクトを解説する**単一ファイルのアニメーション HTML**（ダークモード・スクロールテリング・CJK 対応・依存ゼロ）を生成。
+- **`/html`** — コンセプト、システム、データ、プロダクトを解説する**単一ファイルのアニメーション HTML**（ダークモード・スクロールテリング・CJK 対応・依存ゼロ）を生成。
 - **`/codex`** — OpenAI Codex CLI への橋渡し。コードレビュー、設計相談、バグ調査、セキュリティ監査、セカンドオピニオン用。イベントをストリーミングで通知し、最終回答を実行ごとの結果ファイルに保存。diff の外側の cross-cutting な統合問題も指摘。
 - **`/codexloop`** — Codex を使った反復レビュー＆修正ループ。Codex がレビュー → 合意した指摘を Claude が修正 → 再レビュー → きれいになるか正直な合意不能点に到達するまで継続。回数制限なし。
 - **`/codex-test`** — ヘッドレス/無人のブラウザ・スモーク/e2e テストを Codex CLI にオフロード。隔離された Playwright ブラウザを操作（必要な場合のみログイン済み Chrome セッションに接続）し、フローが通るまでコードを修正して再実行可能。進捗をストリーミングし、PASS/FAIL の判定と加えた変更を報告。
@@ -36,7 +36,7 @@ npx skills add zytakeshi/admin-skills
 npx skills add zytakeshi/admin-skills@deploy
 npx skills add zytakeshi/admin-skills@commit-push
 npx skills add zytakeshi/admin-skills@create-pr
-npx skills add zytakeshi/admin-skills@html-specialist
+npx skills add zytakeshi/admin-skills@html
 npx skills add zytakeshi/admin-skills@codex
 npx skills add zytakeshi/admin-skills@codexloop
 npx skills add zytakeshi/admin-skills@codex-test
@@ -55,7 +55,7 @@ npx skills add zytakeshi/admin-skills@fable5
 | [deploy](skills/deploy/) | SSH/SCP でリモートサーバーにデプロイ。バックアップ、差分検出、キャッシュクリア、スモークテスト付き |
 | [commit-push](skills/commit-push/) | 変更を分析し、コミットメッセージを生成、ステージ・コミット・プッシュを一括実行 |
 | [create-pr](skills/create-pr/) | PR の全ライフサイクルを自動化: コミット、プッシュ、PR 作成、Codex レビュー待機、修正、マージ |
-| [html-specialist](skills/html-specialist/) | 単一ファイルのアニメーション HTML 解説ページを生成 — スクロールテリング、CJK 対応、依存ゼロ |
+| [html](skills/html/) | 単一ファイルのアニメーション HTML 解説ページを生成 — スクロールテリング、CJK 対応、依存ゼロ |
 | [codex](skills/codex/) | OpenAI Codex CLI へのブリッジ。コードレビュー・設計相談・セキュリティ監査・セカンドオピニオン、進捗ストリーミング付き |
 | [codexloop](skills/codexloop/) | Codex を使った反復レビュー＆修正ループ。きれいになるか正直な合意不能点まで継続 |
 | [codex-test](skills/codex-test/) | ヘッドレス/無人のブラウザ・スモーク/e2e テストを Codex CLI にオフロード — Playwright 優先（隔離ブラウザ）、コード修正＆再実行可、PASS/FAIL を報告 |
@@ -73,7 +73,7 @@ npx skills add zytakeshi/admin-skills@fable5
 - `/deploy` — デプロイワークフローを実行
 - `/commit-push` — 変更を分析、コミット、プッシュ
 - `/create-pr` — Codex コードレビュー付き PR を作成
-- `/html-specialist` — 単一ファイルのアニメーション HTML 解説ページを構築
+- `/html` — 単一ファイルのアニメーション HTML 解説ページを構築
 - `/codex` — OpenAI Codex CLI を呼んでレビュー / 相談
 - `/codexloop` — Codex 反復レビュー＆修正ループ
 - `/codex-test` — ヘッドレスのブラウザ・スモーク / e2e テストを Codex にオフロード

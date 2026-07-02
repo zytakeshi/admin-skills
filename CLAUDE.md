@@ -17,7 +17,7 @@ Each skill is a `SKILL.md` file inside `skills/<skill-name>/`, with YAML frontma
 | `skills/deploy/` | SSH/SCP deployment with backup, drift detection, cache clearing, smoke testing |
 | `skills/commit-push/` | Smart commit message generation, stage, commit, push in one step |
 | `skills/create-pr/` | Full PR lifecycle: commit → push → create PR → wait for Codex review → fix → merge |
-| `skills/html-specialist/` | Build a single self-contained animated HTML explainer (scrollytelling, CJK-safe, zero deps) |
+| `skills/html/` | Build a single self-contained animated HTML explainer (scrollytelling, CJK-safe, zero deps) |
 | `skills/codex/` | Bridge to OpenAI Codex CLI for code review / consultation, with streaming progress and per-task ID result files |
 | `skills/codexloop/` | Iterative Codex review-and-fix loop — review, fix agreed findings, re-review, until clean or stable impasse |
 | `skills/codex-test/` | Headless/unattended browser smoke or e2e test delegation to Codex CLI, with Playwright-first browser driving and pass/fail reporting |

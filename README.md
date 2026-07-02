@@ -11,7 +11,7 @@ A collection of sysadmin and DevOps skills for Claude Code. Automate deployments
 - **`/deploy`** — Zero-downtime deployments with mandatory backups, drift detection, and automatic cache clearing. Never forget a rollback plan again.
 - **`/commit-push`** — Analyzes your diffs, generates conventional commit messages, and safely pushes. No more "fix stuff" commits.
 - **`/create-pr`** — Creates a PR and automatically gets it reviewed by [OpenAI Codex](https://chatgpt.com/codex). When the review completes, Claude reads the feedback, fixes the issues it agrees with, pushes the fixes, and asks you to merge — fully automated end-to-end.
-- **`/html-specialist`** — Produces a single self-contained animated `.html` page (dark scrollytelling, CJK-safe, zero dependencies) that explains a concept, system, dataset, or product.
+- **`/html`** — Produces a single self-contained animated `.html` page (dark scrollytelling, CJK-safe, zero dependencies) that explains a concept, system, dataset, or product.
 - **`/codex`** — Bridge to the OpenAI Codex CLI for code review, design consultation, bug investigation, security audits, and second opinions. Streams events as they arrive, captures the final answer to a per-invocation result file, and surfaces cross-cutting integration findings beyond the diff.
 - **`/codexloop`** — Iterative review-and-fix loop with Codex. Codex reviews, Claude fixes the findings it agrees with, repeat until clean (or both sides reach an honest impasse). No fixed iteration cap.
 - **`/codex-test`** — Offload a headless/unattended browser smoke or e2e test to the Codex CLI. It drives an isolated Playwright browser (or attaches to a logged-in Chrome session when one's required), may fix code and re-run until the flow passes, streams progress, and reports a PASS/FAIL verdict plus any changes it made.
@@ -36,7 +36,7 @@ Or install a specific skill:
 npx skills add zytakeshi/admin-skills@deploy
 npx skills add zytakeshi/admin-skills@commit-push
 npx skills add zytakeshi/admin-skills@create-pr
-npx skills add zytakeshi/admin-skills@html-specialist
+npx skills add zytakeshi/admin-skills@html
 npx skills add zytakeshi/admin-skills@codex
 npx skills add zytakeshi/admin-skills@codexloop
 npx skills add zytakeshi/admin-skills@codex-test
@@ -56,7 +56,7 @@ npx skills add zytakeshi/admin-skills@fable5
 | [deploy](skills/deploy/) | Deploy files to remote servers via SSH/SCP with mandatory backup, drift detection, cache clearing, and smoke testing |
 | [commit-push](skills/commit-push/) | Analyze changes, generate a commit message, stage, commit, and push in one step |
 | [create-pr](skills/create-pr/) | Full PR lifecycle: commit, push, create PR, wait for Codex review, fix issues, and merge |
-| [html-specialist](skills/html-specialist/) | Build a single self-contained animated HTML explainer — scrollytelling, CJK-safe, zero dependencies |
+| [html](skills/html/) | Build a single self-contained animated HTML explainer — scrollytelling, CJK-safe, zero dependencies |
 | [codex](skills/codex/) | Bridge to OpenAI Codex CLI for code review, design consultation, security audits, and second opinions — with streaming progress |
 | [codexloop](skills/codexloop/) | Iterative review-and-fix loop with Codex: review → fix → re-review until clean or honest impasse |
 | [codex-test](skills/codex-test/) | Offload a headless/unattended browser smoke or e2e test to the Codex CLI — Playwright-first (isolated browser), may fix code and re-run, reports PASS/FAIL |
@@ -75,7 +75,7 @@ After installing, use the skills in Claude Code:
 - `/deploy` — trigger the deployment workflow
 - `/commit-push` — analyze, commit, and push changes
 - `/create-pr` — create a PR with automated Codex code review
-- `/html-specialist` — build a single-file animated HTML explainer
+- `/html` — build a single-file animated HTML explainer
 - `/codex` — call OpenAI Codex CLI for review / consultation
 - `/codexloop` — iterative codex review-and-fix loop until clean
 - `/codex-test` — offload a headless browser smoke / e2e test to Codex

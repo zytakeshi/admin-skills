@@ -1,5 +1,5 @@
 ---
-name: html-specialist
+name: html
 description: Create a single self-contained animated HTML page that explains a concept, system, dataset, algorithm, or product. Triggers on "make an HTML explainer", "animate this", "visualize how X works", "build an interactive demo", "scrollytelling page", "explain to a non-technical person with a website", "consulting deck as a webpage", "show me X as an animation", or any variation requesting a polished, self-contained HTML artifact (no build step, no framework). Optimized for scrollytelling explainers, technical visualizations, dashboards, and architecture diagrams in dark mode, with full CJK (Chinese / Japanese / Korean) font support.
 ---
 
@@ -16,6 +16,76 @@ This skill was distilled from real-world consulting decks and architecture expla
 Produce **one** `.html` file. No build step. No bundler. Zero external dependencies by default — and if a CDN script is absolutely needed (D3, three.js), pin the version, justify it, and add a graceful fallback.
 
 The viewer must, in one scroll, walk away with the **one key insight** you set out to deliver.
+
+---
+
+## Execution path — delegate generation to Antigravity
+
+For this skill, the calling agent (Claude, Codex, or another compatible agent) is the **orchestrator and reviewer — not the author**. The HTML generation job itself must be delegated to a coding CLI: by default the Antigravity CLI (`agy`); the Grok CLI (`grok`) is a supported alternative when the user asks for it. Delegate unless the user explicitly opts out.
+
+**Why delegate: token discipline.** The whole point of this skill is to keep a ~60 KB artifact *out of the orchestrator's context window*. The generator writes the file straight to disk; you never read it back in full and you never let it stream into chat. Validation is therefore deliberately lightweight (see *Validate frugally* below). If you catch yourself reading the entire HTML into context, opening it in a headless browser, or taking screenshots, you have defeated the skill's purpose — stop.
+
+1. Clarify intent and choose the output path.
+2. Write a short, self-contained delegation prompt that includes the user's request, the chosen path, and the requirements in this skill.
+3. Run `agy` in non-interactive print mode and let it create the `.html` file. Put the prompt immediately after `--print`; otherwise the CLI may treat the next flag as the prompt.
+
+```bash
+cd "<output-directory-or-workspace-root>" && \
+agy --dangerously-skip-permissions \
+  --add-dir "<output-directory-or-workspace-root>" \
+  --print "$(cat "<delegation-prompt>.md")" \
+  --print-timeout 15m
+```
+
+Use `--add-dir` for the directory where the file should be written. Use `--dangerously-skip-permissions` only for this delegated local artifact generation flow so Antigravity can create the file without stalling on tool prompts.
+
+**Alternative generator — Grok CLI (`grok`)**, when the user asks for it. Grok is a full agentic coder; run it in write mode scoped to the output directory (verified working):
+
+```bash
+grok --prompt-file "<delegation-prompt>.md" \
+  --permission-mode bypassPermissions \
+  --no-plan \
+  --cwd "<output-directory-or-workspace-root>" \
+  </dev/null \
+  > /tmp/grok_html_events.jsonl 2> /tmp/grok_html.err
+```
+
+- `--permission-mode bypassPermissions` is the write-capable analog to `agy --dangerously-skip-permissions`; do NOT add a read-only `--tools` allowlist here (that blocks `write_file`). Leave default tools on so `write_file` is available.
+- Run it in the background and watch progress with the Grok progress filter (see the `grok` skill); the file is written via Grok's silent `write_file` tool, and Grok's final text is its self-validation report.
+- Note: Grok may *claim* it "used agy" — a confabulation. Ignore the claim; verify the file on disk per *Validate frugally*.
+
+The delegation prompt must contain this contract:
+
+```text
+You are generating an artifact for the html skill.
+Create exactly one self-contained HTML file at: <absolute-output-path>
+Do not create a build step, package.json, framework app, image assets, or extra source files.
+Keep CSS and JS inline. Avoid external dependencies unless absolutely required; if used, pin versions and add a graceful fallback.
+Include an inline data URI favicon or equivalent so browsers do not emit a missing `/favicon.ico` console error.
+Follow the html skill's standards: visual-first, before/after contrast, animated change, intuitive metaphor, plain language, responsive layout, reduced-motion support, keyboard-accessible controls, no console errors, and CJK-safe font stack when relevant.
+After writing the file, run through the html skill's defensive checklist yourself and reply with the path and a concise PASS/FAIL note per item (self-contained, no console errors, responsive, reduced-motion, favicon, keyboard-accessible, approx KB). Do not paste the full HTML.
+```
+
+If the generator is missing, not authenticated, or fails to write the file, report that clearly and retry once with a narrower prompt. If the retry still fails, fall back to the calling agent generating the single-file HTML directly and mention the failure in the final response.
+
+### Validate frugally — do not read the file back into context
+
+The generator already self-reported the checklist. Trust it, then spot-check **only from the shell** (a few tokens) — never slurp the 60 KB file (~15–20 K tokens) into context:
+
+```bash
+F="<absolute-output-path>"
+[ -f "$F" ] && wc -c "$F"                                    # exists + size (target < ~90 KB)
+grep -cE '<script[^>]*src=|<link[^>]*href=|//cdn' "$F"       # external deps → expect 0 (favicon xmlns is fine)
+grep -c 'prefers-reduced-motion' "$F"                        # ≥ 1
+grep -cE 'console\.(log|error|warn)|alert\(' "$F"            # expect 0
+grep -c '<title>' "$F"                                       # 1
+```
+
+If a grep flags a concrete problem, read **only the offending region** (`grep -n '<pattern>' "$F" | head`) and make a surgical Edit. The first complete draft must come from the generator, not you.
+
+**Do NOT, by default:** read the whole HTML into context, open it in a headless browser (chrome-devtools/playwright), or take screenshots. Those pull the artifact's full token cost back into the orchestrator and defeat the entire point of delegating. Do a browser render or screenshot **only when the user explicitly asks** to verify rendering or see a preview — and even then, prefer saving the screenshot to a file and surfacing it with `SendUserFile` over inlining it.
+
+A deeper, actually-in-a-browser check still happens — just not run by you, and not before delivery. See Step 8: deliver the file, then a Sonnet watchdog sub-agent runs `/codex-test` against it and can fix issues in place.
 
 ---
 
@@ -305,7 +375,7 @@ Use `step-active` and `step-dim` classes to color-code which steps light up vers
 
 ## Step 5 — Build order
 
-Always in this order:
+Use this order inside the `agy` delegation prompt:
 
 1. **Data / state model** — what are the entities, what state do they have?
 2. **Static layout + CSS** — get the whole page looking right *before* adding animation.
@@ -321,6 +391,8 @@ Don't animate first and lay out second. You'll repaint everything.
 
 ## Step 6 — Defensive checks (every build)
 
+**Ownership:** this checklist is the **generator's** job — embed it in the delegation prompt and have the generator self-verify and report PASS/FAIL per item. The orchestrator does NOT re-run these by reading or rendering the file; it only does the cheap shell spot-check in *Validate frugally* above. Keep the list here so you can paste the relevant items into the delegation prompt.
+
 Editorial checks first — these are the point of the skill (see Core principles):
 
 - [ ] **Visual-first:** no scene is a wall of text — each makes its point with a diagram, animation, or visual contrast.
@@ -332,7 +404,7 @@ Editorial checks first — these are the point of the skill (see Core principles
 Then the technical checks:
 
 - [ ] **Self-contained:** `<style>` and `<script>` are inline; the file opens standalone.
-- [ ] **No console errors** on load and during scroll.
+- [ ] **No console errors** on load and during scroll, including missing favicon 404s.
 - [ ] **Responsive:** test 320px (small phone), 768px (tablet), 1440px (desktop). Use `clamp()` for fluid type, `grid-template-columns: repeat(auto-fit, minmax(...))` for cards.
 - [ ] **`prefers-reduced-motion`:** disable heavy animation (canvas off, transforms reduced) when set.
 - [ ] **DPR-aware Canvas:** crisp on Retina (see §4.5).
@@ -351,14 +423,46 @@ Then the technical checks:
 When delivering, give the user three things, in this order:
 
 1. **One paragraph** summarizing what the page shows, your design choices, and any assumptions you made.
-2. **The path to the saved `.html` file.** Write the file with the `Write` tool to a sensibly-named path (e.g., `~/Desktop/custom-dns-explainer-zh-2026-05-28.html`, or under `docs/` in the current project). Never dump the full HTML into chat — for a 60 KB file that wastes a 90 KB output budget. The file is the deliverable.
+2. **The path to the saved `.html` file.** Have `agy` write the file to a sensibly-named path (e.g., `~/Desktop/custom-dns-explainer-zh-2026-05-28.html`, or under `docs/` in the current project). Never dump the full HTML into chat — for a 60 KB file that wastes a 90 KB output budget. The file is the deliverable.
 3. **A short "how to use"** — how to open it (`open <path>`), which parameters/CSS variables to tweak, and any controls/interactions.
 
 Optionally use `SendUserFile` to surface the artifact to the user proactively.
 
+**Deliver this now — don't wait for Step 8.** The watchdog QA below runs *after* this goes out, not before.
+
 ---
 
-## Step 8 — Hosting (optional)
+## Step 8 — Post-delivery QA: Sonnet watchdog runs `/codex-test` (best-effort)
+
+**Deliver first, verify second.** Step 7's deliverable goes to the user the moment the file is generated and frugally validated. Don't hold it hostage to a browser-driven test — speed is the point. If the watchdog below catches something, the user gets a short, separate follow-up moments later with the fix already applied to the same path.
+
+**Availability check (cheap, before spawning anything):**
+
+```bash
+command -v codex >/dev/null 2>&1 && echo HAVE_CODEX || echo NO_CODEX
+```
+
+- **`NO_CODEX`, or the `codex-test` skill isn't available in this environment:** skip this step entirely — no watchdog, no substitute check. Note it in one clause of the Step 7 paragraph ("automated post-delivery QA skipped — codex-test not installed") and stop there. Do **not** compensate with a heavier check of your own (opening a headless browser, screenshotting) — that reintroduces the exact token cost this skill exists to avoid (see *Validate frugally* above). This add-on is best-effort, never a blocker.
+- **`HAVE_CODEX`:** proceed below. If it's ambiguous whether the `codex-test` skill itself is installed, just attempt it — the watchdog contract below already defines a clean `STATUS: SKIPPED` path if the invocation fails.
+
+**Spawn one watchdog sub-agent** via the `Agent` tool — `model: "sonnet"`, `subagent_type: "general-purpose"`. It does not inherit this skill or this conversation, so the prompt must be fully self-contained:
+
+- the absolute path of the file you just delivered, and the test target `file://<absolute-path>` (a static local file — no login, no credentials, no staging URL needed),
+- the invocation instruction: *use the `Skill` tool with `skill: "codex-test"`, passing the target and the success criteria below as `args`*,
+- success criteria, lifted straight from this skill's Step 6 checklist: loads with **zero console errors/warnings** (including no missing-favicon 404), **responsive** at 320 / 768 / 1440px, `prefers-reduced-motion` honored, scroll reveals / animations actually fire, every interactive control is keyboard-reachable,
+- explicit permission to let codex-test **fix the HTML file in place** if it finds a real issue — that's the whole reason to route through codex-test instead of a read-only check,
+- and this reporting contract: *"Invoke codex-test on the target above with those success criteria. Reply with exactly one status line: `STATUS: PASS`, `STATUS: FIXED`, or `STATUS: SKIPPED`. For FIXED, add a short bullet list (what was wrong → what changed) — no full HTML, no diffs. For SKIPPED, add the one-line reason (e.g. codex-test unavailable, codex CLI errored, no browser driver). Do not ask the user anything — resolve or report, autonomously."*
+
+**On return:**
+- `STATUS: PASS` — nothing further to say; the delivered file was already correct.
+- `STATUS: FIXED` — send a short follow-up (a few lines, not a re-delivery of Step 7): what the watchdog caught and fixed. The same path now holds the corrected file.
+- `STATUS: SKIPPED` — mention briefly if the pre-flight check above hadn't already caught it.
+
+If the user explicitly wants to wait for QA before treating the file as final (e.g. "don't tell me it's done until it's tested"), skip the "deliver first" framing for that one request and run this step inline, before Step 7, instead.
+
+---
+
+## Step 9 — Hosting (optional)
 
 If the user asks to host the page:
 
@@ -404,7 +508,7 @@ git push -u origin gh-pages
 
 ---
 
-## Step 9 — When to escalate
+## Step 10 — When to escalate
 
 If the requested page genuinely **cannot** be a single self-contained HTML file (it needs a backend, a large local dataset, proprietary auth, a server-side language), say so plainly and propose the closest self-contained approximation: mocked data, simplified scope, or a `fetch()` against a public read-only API with a graceful failure mode.
 
