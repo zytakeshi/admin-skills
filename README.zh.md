@@ -15,6 +15,7 @@
 - **`/codex`** — 桥接 OpenAI Codex CLI，用于代码审查、设计咨询、Bug 调查、安全审计与第二意见。流式推送事件，最终回答按调用 ID 存储到独立结果文件，超越 diff 本身发现跨层集成问题。
 - **`/codexloop`** — 用 Codex 做迭代审查＋修复循环：Codex 审查 → Claude 修复认可的问题 → 再审查 → 直到代码干净或双方达成"诚实的分歧"。无固定迭代上限。
 - **`/codex-test`** — 把无头/无人值守的浏览器冒烟或 e2e 测试卸载给 Codex CLI。它驱动隔离的 Playwright 浏览器（仅在需要时接入已登录的 Chrome 会话），可修改代码并重跑直到流程通过，流式推送进度，并报告 PASS/FAIL 结论及所做改动。
+- **`/ask-chatgpt-pro`** — 在 ChatGPT 浏览器界面调用可用的最强 GPT Pro 模型，用于高风险规格、架构/迁移决策、对比、带来源的研究或批判性评审；随后在本地验证并适配结果。
 - **`/fleet-review`** — 派出 10〜15 个只读子代理并行扫描代码库，输出按严重度排序的审计报告。语言无关。纯计划阶段——零文件改动。
 - **`/team`** — 编排代理团队并行实施计划、规格或多文件任务。自动拆解工作、在 tmux 面板里生成带作用域的队员、整合各方输出。
 - **`/finish-translation`** — 自动检测项目的 i18n 框架（ARB、JSON/i18next、.strings、.xcstrings、gettext、YAML/Rails、Android XML、.resx），并执行翻译传播、审计或硬编码字符串扫描。
@@ -40,6 +41,7 @@ npx skills add zytakeshi/admin-skills@html
 npx skills add zytakeshi/admin-skills@codex
 npx skills add zytakeshi/admin-skills@codexloop
 npx skills add zytakeshi/admin-skills@codex-test
+npx skills add zytakeshi/admin-skills@ask-chatgpt-pro
 npx skills add zytakeshi/admin-skills@fleet-review
 npx skills add zytakeshi/admin-skills@team
 npx skills add zytakeshi/admin-skills@finish-translation
@@ -59,6 +61,7 @@ npx skills add zytakeshi/admin-skills@fable5
 | [codex](skills/codex/) | 桥接 OpenAI Codex CLI，做代码审查、设计咨询、安全审计与第二意见，带进度流式推送 |
 | [codexloop](skills/codexloop/) | 用 Codex 做迭代审查＋修复循环，直到代码干净或双方达成诚实分歧 |
 | [codex-test](skills/codex-test/) | 把无头/无人值守的浏览器冒烟或 e2e 测试卸载给 Codex CLI — Playwright 优先（隔离浏览器），可改代码并重跑，报告 PASS/FAIL |
+| [ask-chatgpt-pro](skills/ask-chatgpt-pro/) | 在 ChatGPT 浏览器界面咨询 GPT Pro 模型，用于重要规格、架构/迁移决策、对比、带来源的研究或批判性评审，并在本地验证适配 |
 | [fleet-review](skills/fleet-review/) | 派出 10〜15 个只读子代理并行审计代码库，纯计划阶段、语言无关 |
 | [team](skills/team/) | 编排代理团队并行实施：拆解 → tmux 面板生成队员 → 整合输出 |
 | [finish-translation](skills/finish-translation/) | 自动检测 i18n 框架，传播 / 审计 / 扫描全部 locale 的翻译与硬编码字符串 |
@@ -77,6 +80,7 @@ npx skills add zytakeshi/admin-skills@fable5
 - `/codex` — 调用 OpenAI Codex CLI 做审查 / 咨询
 - `/codexloop` — Codex 迭代审查＋修复循环
 - `/codex-test` — 把无头浏览器冒烟 / e2e 测试卸载给 Codex
+- `/ask-chatgpt-pro` — 在 ChatGPT 浏览器界面咨询 GPT Pro 模型，处理高风险决策和研究
 - `/fleet-review` — 用 10〜15 个并行子代理审计代码库
 - `/team` — 启动代理团队实施多文件任务
 - `/finish-translation` — 同步 / 审计所有 locale 的翻译

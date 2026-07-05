@@ -21,6 +21,7 @@ Each skill is a `SKILL.md` file inside `skills/<skill-name>/`, with YAML frontma
 | `skills/codex/` | Bridge to OpenAI Codex CLI for code review / consultation, with streaming progress and per-task ID result files |
 | `skills/codexloop/` | Iterative Codex review-and-fix loop — review, fix agreed findings, re-review, until clean or stable impasse |
 | `skills/codex-test/` | Headless/unattended browser smoke or e2e test delegation to Codex CLI, with Playwright-first browser driving and pass/fail reporting |
+| `skills/ask-chatgpt-pro/` | Consult the strongest available GPT Pro model in the ChatGPT browser UI for high-stakes decisions, research, critique, specs, or architecture |
 | `skills/fleet-review/` | Parallel codebase audit with 10–15 read-only sub-agents, language-agnostic, planning-only |
 | `skills/team/` | Orchestrate parallel agent teams via `TeamCreate` + tmux-pane teammates, with integration validation |
 | `skills/finish-translation/` | Multi-framework i18n: detect → audit → propagate / find hardcoded strings (ARB, JSON, .strings, .xcstrings, gettext, YAML, Android XML, .resx) |
@@ -42,7 +43,9 @@ Each skill is a `SKILL.md` file inside `skills/<skill-name>/`, with YAML frontma
 - `gh` (GitHub CLI) — create-pr skill
 - `ssh`, `scp` — deploy skill
 - `~/ssh/hosts.md` — deploy skill looks here for server connection details
-- `curl`, `rsync`, Google Chrome (macOS) — cdp-chrome skill
+- ChatGPT browser UI / Google Chrome — ask-chatgpt-pro skill
+- `grok`, `timeout`, optional `jq` — ask-grok skill
+- `curl`, `rsync`, `lsof`, `pgrep`, Google Chrome (macOS) — cdp-chrome skill
 
 ## Downstream Repos
 
