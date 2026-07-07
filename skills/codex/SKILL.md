@@ -37,22 +37,36 @@ Determine what to feed Codex based on user intent:
 - **Branch name** - run `git diff main...<branch>`
 - **No specific target** - operate on the whole project directory
 
-### Step 2.5: Delegate the run to a Sonnet 5 watchdog sub-agent (default)
+### Step 2.5: Run via `codex-guard.sh` — deterministic supervisor, no watchdog agent (default)
 
-A codex run emits a noisy JSONL event stream you must babysit for hangs. Keep that noise — and the babysitting — **out of the caller's context** by delegating the whole run to a sub-agent. Launching, streaming, hang-detection and recovery are pure execution with an easy-to-verify result, so the runner is **Sonnet 5** (never Haiku); the *triage* of what codex finds stays with you, the caller.
+Babysitting a codex run is pure rules (launch, watch, kill-on-startup-hang, retry once, report), so it is done by a **script**, not an LLM. `scripts/codex-guard.sh` (next to this skill) supervises the whole run and guarantees the caller's context stays clean: codex's JSONL event stream is swallowed into `/tmp/codex_events_<TASK_ID>.jsonl` and **never** printed; the guard's own stdout is only a handful of milestone lines plus one final `STATUS:` line.
 
-Spawn **one** sub-agent via the `Agent` tool — `model: "sonnet"`, `subagent_type: "general-purpose"` — with a **self-contained** prompt (it does not inherit this skill, so paste in everything it needs):
+After constructing the codex command in Step 3 (points 1–4: prompt, probes, `TASK_ID`), launch it wrapped in the guard, with `run_in_background: true`:
 
-- the **exact, fully-quoted** codex command you constructed in Step 3 — pasted **literally**, including the complete `"<constructed_prompt>"`, the `TASK_ID`, `--cd <dir>`, `-o`/events paths, every flag, and `</dev/null`. The runner runs it verbatim and must **not** reconstruct the prompt or re-derive intent,
-- the progress-filter script (Step 6) and the `Monitor` tail command,
-- the **Hang detection & auto-recovery** section (below),
-- and this contract: *"Run it with `run_in_background: true`, stream progress via `Monitor`, then **block on the result with a single foreground wait** (`until [ -s /tmp/codex_result_<TASK_ID>.txt ]; do sleep 5; done`, capped by the hang timeout) — do not end your turn early or emit repeated 'still waiting' heartbeats. Apply hang-detection + auto-recovery yourself, then return ONLY the result, prefixed with one line `STATUS: COMPLETED | RECOVERED | FALLBACK | FAILED`. For COMPLETED/RECOVERED, return the full contents of `/tmp/codex_result_<TASK_ID>.txt` verbatim. For FALLBACK (codex hung twice → you did a native read-through review of the same diff yourself), return that review body instead (there is no result file). Do NOT triage, fix, edit, or commit anything — you are the runner, not the reviewer."*
+```bash
+bash ~/.claude/skills/codex/scripts/codex-guard.sh <TASK_ID> 1800 -- \
+  codex exec --json --sandbox read-only --skip-git-repo-check \
+  -c model_reasoning_effort=xhigh -c service_tier="fast" \
+  --cd <project_directory> -o /tmp/codex_result_<TASK_ID>.txt "<constructed_prompt>"
+```
 
-You receive only that result text; run Step 4 / triage on it. The event stream never enters your context, and while the runner works the `Agent` call blocks without burning caller tokens.
+- `1800` is the hard wall-clock cap in seconds (30 min). Raise it per-run for very large audits. The guard closes stdin itself — you don't need `</dev/null` here.
+- **Do NOT start a Monitor, poll, or sleep-loop.** The background task notifies you exactly once, when the guard exits — no per-event notifications spam the session. (Only if the user explicitly asks for live progress, run the Step 6 Monitor tail on the events file — the filter emits one short line per event.)
+- The `-o` path **must** use the same `<TASK_ID>` as the guard's first argument — that convention is how the guard finds the result/events files and how its scoped kill works.
 
-**Run inline instead (skip delegation)** when you are *already* a sub-agent, in a non-interactive/cron context, or the harness can't spawn agents — then execute Steps 3–7 yourself. If the runner sub-agent errors or dies, re-run inline once. Delegation is the default, not a hard requirement.
+**Two-phase hang logic (inside the script — you don't implement this):** all known codex hangs (stdin, `--full-auto`+`--json`) wedge *before* the session starts, emitting zero events — so the guard kills and retries once only if **no** JSONL appears within 120s of launch. Once the first event arrives, silence is treated as normal (long xhigh reasoning turns are quiet for minutes); only the hard cap applies after that.
 
-> Steps 3–7 below are exactly what the runner executes internally — when delegating, you don't run them in your own context.
+When the completion notification arrives, read the guard's output / `/tmp/codex_status_<TASK_ID>.txt` and act on the STATUS line:
+
+| STATUS | Meaning | Your move |
+|--------|---------|-----------|
+| `COMPLETED` / `RECOVERED` | Result is in `/tmp/codex_result_<TASK_ID>.txt` | Read it, run Step 4 / triage |
+| `TIMEOUT` | codex was **alive but slow** — exceeded the cap (diagnostics attached) | Judgment call: re-run with a higher cap, narrow the scope, or fall back to native review |
+| `FAILED` | Hung at startup twice, or crashed without a result (diagnostics attached) | **The fallback review is YOURS:** do it yourself or spawn a fresh **Opus** reviewer over the same diff (never Haiku/Sonnet — review is judgment work). Tell the user codex was unavailable and they can run `! codex …` interactively. |
+
+**If the guard script is missing** (skill checked out without `scripts/`, or a remote context), fall back to running Steps 3–7 inline yourself, applying the Hang-recovery section manually.
+
+> Steps 3–7 below are the manual/inline path. With the guard, you still do Step 3 points 1–4 (construct the command) and Step 4 (report); the guard replaces points 5–7's launch-and-babysit.
 
 ### Step 3: Construct and Execute (with streaming progress)
 
@@ -167,19 +181,18 @@ Present Codex's output clearly. For code reviews, organize by severity:
 
 For non-review tasks (consulting, bug investigation), summarize findings naturally.
 
-## Hang detection & auto-recovery (do this automatically — don't wait to be told)
+## Hang detection & auto-recovery (inline mode only — `codex-guard.sh` does all of this for you)
 
-`codex exec` can wedge with **zero output** and near-zero CPU, indefinitely. Treat a hung codex as an expected failure mode and recover on your own the moment you detect it — never sit waiting for a completion notification that will never arrive.
+`codex exec` can wedge with **zero output** and near-zero CPU, indefinitely. In the default path this whole section is implemented deterministically by `scripts/codex-guard.sh`; apply it manually only when running inline without the guard. Treat a hung codex as an expected failure mode and recover the moment you detect it — never sit waiting for a completion notification that will never arrive.
 
 **Root causes, in order of likelihood:**
 1. **stdin left open** — codex stalls at "Reading additional input from stdin..." forever. The fix is `</dev/null`. This is the #1 cause, and it happens almost every time someone shells out to `codex exec` manually instead of using this skill (which closes stdin for you). If you pipe stdout through `| tee` without `</dev/null`, codex stalls on its stdin reader.
 2. **`--full-auto` + `--json`** — deprecated combo that reliably hangs. Never pass `--full-auto`.
 3. **Bash-tool auto-backgrounding** a long foreground run (e.g. `timeout: 600000`) whose stdin is a pipe — same stdin stall, now invisible because it's backgrounded.
 
-**Detection signal (any one is enough):**
-- No JSONL events in the events file (or only your own `echo` header in the result file) after **~2 minutes**.
-- `ps -p <pid> -o stat,etime,cputime` shows the codex process `S` (sleeping) with `cputime` stuck near `0:00` while `etime` keeps climbing.
-- A `Monitor` tail emits nothing for >2 minutes.
+**Detection signal — two-phase (silence alone is NOT a hang signal mid-run):**
+- **Startup gate:** all the root causes above wedge codex *before* the session starts — a hung run emits **zero** JSONL events, not even `thread.started` (a healthy run emits it within seconds). No events within **~2 minutes of launch** → it's hung; kill and retry.
+- **After the first event:** silence is normal — a long xhigh reasoning turn blocks on the model API with no output and near-zero CPU, the *same* signature as a hang, so do NOT kill on silence or `cputime`-stuck alone. Only a generous hard wall-clock cap (default 30 min) applies; hitting it means "alive but slow" (TIMEOUT), a judgment call — not a wedge.
 
 **Auto-recovery procedure (run it yourself, immediately, without asking):**
 1. **Kill only THIS run's tree** — never a blunt fleet-wide kill, because parallel codex runs and other watchdogs may be live (this skill's own delegation spawns one runner per review, so concurrency is the norm). The `TASK_ID` is in codex's argv and the `tee` target, so scope by it:
@@ -188,7 +201,7 @@ For non-review tasks (consulting, bug investigation), summarize findings natural
    ```
    Prefer `TaskStop` on the background Bash task by its task id, and `TaskStop` any Monitor task so it stops firing. Only fall back to the blunt `pkill -9 -f "codex exec"` if no `TASK_ID`-scoped process can be identified **and** you've confirmed no other codex run is in flight.
 2. **Retry once, correctly** — via this skill's canonical invocation: background, `--json`, `--sandbox read-only`, `--skip-git-repo-check`, `-o /tmp/codex_result_<TASK_ID>.txt`, and **`</dev/null`**. In practice just adding `</dev/null` fixes it. Do NOT shell out with a bare `codex exec … | tee` and no stdin redirect — that is what hung.
-3. **If it hangs a second time, stop fighting codex.** Fall back to a Claude-native review (a fresh Opus reviewer over the same diff) so the user still gets a thorough review, and tell them codex was unavailable and that they can run it themselves interactively via `! codex …` (interactive codex doesn't hit the headless stdin hang).
+3. **If it hangs a second time, stop fighting codex** (the guard reports this as `STATUS: FAILED`). Fall back to a Claude-native review — yourself or a fresh **Opus** reviewer over the same diff (review is judgment work; never Haiku/Sonnet) — so the user still gets a thorough review, and tell them codex was unavailable and that they can run it themselves interactively via `! codex …` (interactive codex doesn't hit the headless stdin hang).
 
 The cardinal rule: a hung codex must never silently block the task. Detect → kill → retry-with-`</dev/null` → fall back. Prefer invoking codex through **this skill** (or the `Skill` tool) rather than hand-rolling `codex exec`, precisely so stdin is closed and the recovery path is consistent.
 
@@ -211,7 +224,7 @@ The cardinal rule: a hung codex must never silently block the task. Detect → k
 - Always use `--sandbox read-only` — Codex must never modify the codebase.
 - **Always pass `-c service_tier="fast"`** to force Codex fast mode (lower-latency service tier). Never drop reasoning effort below `xhigh` to "go faster" — use fast mode instead.
 - If `$ARGUMENTS` is empty or only contains "review" with no further description, **default to reviewing all uncommitted changes** (run `git diff` + `git diff --staged` to gather context).
-- **Always run in background with `--json` + `Monitor` streaming** so the user can see codex's activity in real time instead of staring at a silent process. Never redirect stdout to `/dev/null`.
+- **Always run in background via `codex-guard.sh`** (Step 2.5). Do not add a `Monitor` by default — the guard's single completion notification is the signal, and per-event Monitor notifications spam the calling session. Use the Step 6 Monitor tail only when the user explicitly wants live progress. Never redirect codex stdout to `/dev/null` (the guard captures it to the events file for post-mortems).
 - **Always use `run_in_background: true`** on the Bash tool call so the user isn't blocked while Codex works. When the completion notification arrives, read `/tmp/codex_result_<TASK_ID>.txt` for the final answer and summarize it.
 - **Never hardcode `/tmp/codex_result.txt` or `/tmp/codex_events.jsonl`.** Always generate a per-invocation `TASK_ID` (slug + `$(date +%Y%m%d_%H%M%S)` timestamp, e.g. `review_staged_20260513_143022`) and use `/tmp/codex_result_<TASK_ID>.txt` + `/tmp/codex_events_<TASK_ID>.jsonl`. The human-readable timestamp keeps `/tmp` listings legible and chronologically sortable; do NOT use raw `$(date +%s)` epoch seconds. This avoids collisions when multiple codex runs overlap (parallel reviews, nested /codex from other skills, back-to-back retries).
 - **Never pass `--full-auto`** (deprecated since codex 0.130) and **always close stdin via `</dev/null`** — otherwise codex hangs at "Reading additional input from stdin..." forever. If you observe zero JSONL events after 2+ minutes, suspect this hang first and kill the process.
