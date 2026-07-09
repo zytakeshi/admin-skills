@@ -62,6 +62,7 @@ When the completion notification arrives, read the guard's output / `/tmp/codex_
 |--------|---------|-----------|
 | `COMPLETED` / `RECOVERED` | Result is in `/tmp/codex_result_<TASK_ID>.txt` | Read it, run Step 4 / triage |
 | `TIMEOUT` | codex was **alive but slow** — exceeded the cap (diagnostics attached) | Judgment call: re-run with a higher cap, narrow the scope, or fall back to native review |
+| `STALLED` | Wedged **mid-run** on a collab sub-agent tool call — events frozen with a pending `collab_tool_call` (diagnostics attached) | Re-run once with the same prompt — the mandatory no-collab preamble (Step 3 point 3) normally prevents this; make sure it's present. If it stalls again, fall back per `FAILED`. |
 | `FAILED` | Hung at startup twice, or crashed without a result (diagnostics attached) | **The fallback review is YOURS:** do it yourself or spawn a fresh **Opus** reviewer over the same diff (never Haiku/Sonnet — review is judgment work). Tell the user codex was unavailable and they can run `! codex …` interactively. |
 
 **If the guard script is missing** (skill checked out without `scripts/`, or a remote context), fall back to running Steps 3–7 inline yourself, applying the Hang-recovery section manually.
@@ -79,9 +80,9 @@ When the completion notification arrives, read the guard's output / `/tmp/codex_
      3. State-emit races: does this introduce or modify a state-event emitter (broadcast, channel invoke, EventSink)? Are there sibling emitters on the same channel that could race? Are consumers tolerant of transient state flips?
    Mark each finding as either IN-DIFF or CROSS-CUTTING so the implementer can triage.
    ```
-3. Append this instruction at the end to prevent Codex from pausing to ask questions:
+3. Append this instruction at the end to prevent Codex from pausing to ask questions, and to prevent the collab sub-agent wedge (headless codex at xhigh spawns "collab" verifier sub-agents that can die silently and wedge the whole run on `close_agent` — observed 2026-07-09; the verifier lane has never returned useful output headlessly):
    ```
-   No confirmation or questions needed. Proactively output specific proposals, fixes, and code examples.
+   Work single-threaded: do NOT spawn any collaborator/verifier sub-agents or use collab tools — do the entire task yourself directly. No confirmation or questions needed. Proactively output specific proposals, fixes, and code examples.
    ```
 4. **Derive a task-specific ID for output paths.** Never hardcode `codex_result.txt` / `codex_events.jsonl` — multiple concurrent codex runs (parallel reviews, nested loops, retries) would clobber each other's output. Build `TASK_ID` as `<short-slug>_<timestamp>`:
    - slug: 2-4 lowercase tokens describing the task (`review_staged`, `security_auth`, `bug_login_timeout`, `ask_api_design`). Derive from the mode + main noun in the user's request.
@@ -189,10 +190,11 @@ For non-review tasks (consulting, bug investigation), summarize findings natural
 1. **stdin left open** — codex stalls at "Reading additional input from stdin..." forever. The fix is `</dev/null`. This is the #1 cause, and it happens almost every time someone shells out to `codex exec` manually instead of using this skill (which closes stdin for you). If you pipe stdout through `| tee` without `</dev/null`, codex stalls on its stdin reader.
 2. **`--full-auto` + `--json`** — deprecated combo that reliably hangs. Never pass `--full-auto`.
 3. **Bash-tool auto-backgrounding** a long foreground run (e.g. `timeout: 600000`) whose stdin is a pipe — same stdin stall, now invisible because it's backgrounded.
+4. **Collab sub-agent wedge (MID-RUN — the only known post-startup wedge).** Headless codex at xhigh spawns "collab" verifier sub-agents; when one dies silently, codex hangs forever on the `close_agent` collab tool call (observed 2026-07-09: events file frozen 19+ min right after `item.started` of a `collab_tool_call`, zero CPU). Prevented by the mandatory no-collab prompt preamble (Step 3 point 3); detected by the guard's STALL gate (`STATUS: STALLED`).
 
 **Detection signal — two-phase (silence alone is NOT a hang signal mid-run):**
-- **Startup gate:** all the root causes above wedge codex *before* the session starts — a hung run emits **zero** JSONL events, not even `thread.started` (a healthy run emits it within seconds). No events within **~2 minutes of launch** → it's hung; kill and retry.
-- **After the first event:** silence is normal — a long xhigh reasoning turn blocks on the model API with no output and near-zero CPU, the *same* signature as a hang, so do NOT kill on silence or `cputime`-stuck alone. Only a generous hard wall-clock cap (default 30 min) applies; hitting it means "alive but slow" (TIMEOUT), a judgment call — not a wedge.
+- **Startup gate:** root causes 1–3 wedge codex *before* the session starts — a hung run emits **zero** JSONL events, not even `thread.started` (a healthy run emits it within seconds). No events within **~2 minutes of launch** → it's hung; kill and retry.
+- **After the first event:** silence is normal — a long xhigh reasoning turn blocks on the model API with no output and near-zero CPU, the *same* signature as a hang, so do NOT kill on silence or `cputime`-stuck alone. The one exception is the precise collab-wedge signature (root cause 4): events file mtime frozen for ~8+ min AND the last JSONL event is an `item.started` `collab_tool_call` — that IS a wedge; kill and re-run with the no-collab preamble. Anything else frozen is just slow: only the generous hard wall-clock cap (default 30 min) applies; hitting it means "alive but slow" (TIMEOUT), a judgment call — not a wedge.
 
 **Auto-recovery procedure (run it yourself, immediately, without asking):**
 1. **Kill only THIS run's tree** — never a blunt fleet-wide kill, because parallel codex runs and other watchdogs may be live (this skill's own delegation spawns one runner per review, so concurrency is the norm). The `TASK_ID` is in codex's argv and the `tee` target, so scope by it:
