@@ -22,6 +22,19 @@
 #   cdp-chrome reseed    # refresh the copied profile from your real one (logins)
 #   cdp-chrome status    # up / down
 #   cdp-chrome config    # print the chrome-devtools-mcp args to use
+#   cdp-chrome mode [copied|autoconnect]  # flip chrome-devtools-mcp between the two
+#                        # attach modes in ~/.claude.json (no arg = show current). See MODES.
+#   cdp-chrome allow-watch  # EXPERIMENTAL: for autoconnect mode, auto-click Chrome's
+#                        # "Allow remote debugging?" dialog (bounded osascript loop).
+#
+# TWO ATTACH MODES (mode switch rewrites mcpServers.chrome-devtools.args in ~/.claude.json)
+#   copied      (DEFAULT, recommended) → --browserUrl http://127.0.0.1:<PORT>
+#               Attaches to the dedicated copied-profile Chrome this tool runs (start/reseed).
+#               No consent dialog ever. Needs `cdp-chrome start` up first.
+#   autoconnect (Chrome 144+)          → --autoConnect
+#               Attaches chrome-devtools-mcp to your REAL running Chrome (live tabs / real
+#               session / LAN). Chrome pops a native "Allow remote debugging?" dialog EVERY
+#               session that no automation can suppress; use `allow-watch` to auto-click it.
 #
 # ENV OVERRIDES (defaults shown)
 #   CDP_PORT=9222
@@ -30,6 +43,8 @@
 #   CDP_PROFILE_DIR="Default"                        # which profile inside it (e.g. "Profile 1")
 #   CDP_CHROME="/Applications/Google Chrome.app"     # the .app BUNDLE (passed to open -a)
 #   CDP_ALLOW_ORIGINS=""   (UNSET = no --remote-allow-origins flag; see SECURITY in SKILL.md)
+#   CDP_CLAUDE_CONFIG="$HOME/.claude.json"           # MCP host config the mode switch edits
+#   CDP_ALLOW_WATCH_SECONDS=60                        # how long `allow-watch` scans before giving up
 #
 # SECURITY DEFAULT: CDP_ALLOW_ORIGINS is UNSET by default, so --remote-allow-origins is
 #   NOT passed. Chrome then accepts only CDP websocket connections with no Origin header
@@ -45,6 +60,8 @@ SRC="${CDP_SOURCE_PROFILE:-$HOME/Library/Application Support/Google/Chrome}"
 PROFILE_DIR="${CDP_PROFILE_DIR:-Default}"
 CHROME="${CDP_CHROME:-/Applications/Google Chrome.app}"   # .app bundle for open -a
 ALLOW_ORIGINS="${CDP_ALLOW_ORIGINS-}"   # unset → empty → flag omitted (secure default)
+CLAUDE_CONFIG="${CDP_CLAUDE_CONFIG:-$HOME/.claude.json}"   # MCP host config edited by `mode`
+WATCH_SECONDS="${CDP_ALLOW_WATCH_SECONDS:-60}"            # `allow-watch` scan budget (seconds)
 MARKER="$DST/.cdp-seeded-$PROFILE_DIR"  # per-profile; written "ok" only after a complete reseed
 
 # A real CDP endpoint returns JSON containing webSocketDebuggerUrl. Use -f so HTTP
@@ -168,11 +185,227 @@ args (e.g. in ~/.claude.json under mcpServers.chrome-devtools.args):
 EOF
 }
 
+# mode [copied|autoconnect] — flip chrome-devtools-mcp's attach mode by rewriting
+#   mcpServers.chrome-devtools.args in $CLAUDE_CONFIG. No arg = show the current mode.
+#   The JSON edit is done in Python (present on this Mac): it backs the file up first,
+#   preserves the package spec + any extra user flags, swaps only the connection flag,
+#   then re-parses the result to validate (restoring the backup if it's not valid JSON).
+mode() {
+  local want="${1:-}"
+  command -v python3 >/dev/null 2>&1 || {
+    echo "mode needs python3 to edit $CLAUDE_CONFIG safely, but python3 was not found." >&2
+    exit 1
+  }
+  [ -f "$CLAUDE_CONFIG" ] || {
+    echo "MCP host config not found: $CLAUDE_CONFIG" >&2
+    echo "(override with CDP_CLAUDE_CONFIG=/path/to/config)" >&2
+    exit 1
+  }
+  case "$want" in
+    ""|show)
+      python3 - "$CLAUDE_CONFIG" <<'PY'
+import json, sys
+path = sys.argv[1]
+try:
+    d = json.load(open(path, encoding='utf-8'))
+except Exception as e:
+    print(f"could not parse {path}: {e}"); sys.exit(1)
+def collect(d):
+    hits = []
+    ms = d.get('mcpServers')
+    if isinstance(ms, dict) and isinstance(ms.get('chrome-devtools'), dict):
+        hits.append(('mcpServers', ms['chrome-devtools']))
+    for name, proj in (d.get('projects') or {}).items():
+        if isinstance(proj, dict):
+            pms = proj.get('mcpServers')
+            if isinstance(pms, dict) and isinstance(pms.get('chrome-devtools'), dict):
+                hits.append((f'projects[{name}]', pms['chrome-devtools']))
+    return hits
+hits = collect(d)
+if not hits:
+    print("no chrome-devtools MCP server found in this config."); sys.exit(0)
+for where, srv in hits:
+    args = srv.get('args') or []
+    if '--autoConnect' in args:
+        m = 'autoconnect (--autoConnect → real Chrome, dialog per session)'
+    elif '--browserUrl' in args:
+        i = args.index('--browserUrl')
+        url = args[i+1] if i+1 < len(args) else '?'
+        m = f'copied (--browserUrl {url} → dedicated copied-profile Chrome)'
+    else:
+        m = 'unknown (neither --autoConnect nor --browserUrl present)'
+    print(f'{where}: {m}')
+PY
+      exit 0 ;;
+    copied|autoconnect) : ;;
+    *) echo "usage: cdp-chrome mode [copied|autoconnect]   (no arg = show current)" >&2; exit 2 ;;
+  esac
+
+  # Back up first (timestamped, never clobbering an earlier backup), then edit + validate.
+  local backup; backup="$CLAUDE_CONFIG.cdp-chrome-bak-$(date +%Y%m%d-%H%M%S)"
+  cp -p "$CLAUDE_CONFIG" "$backup" || { echo "could not back up $CLAUDE_CONFIG" >&2; exit 1; }
+
+  if python3 - "$want" "$PORT" "$CLAUDE_CONFIG" "$backup" <<'PY'
+import json, sys
+mode, port, path, backup = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+try:
+    d = json.load(open(path, encoding='utf-8'))
+except Exception as e:
+    print(f"refusing to edit — {path} is not valid JSON as-is: {e}", file=sys.stderr); sys.exit(1)
+
+def collect(d):
+    hits = []
+    ms = d.get('mcpServers')
+    if isinstance(ms, dict) and isinstance(ms.get('chrome-devtools'), dict):
+        hits.append(ms['chrome-devtools'])
+    for proj in (d.get('projects') or {}).values():
+        if isinstance(proj, dict):
+            pms = proj.get('mcpServers')
+            if isinstance(pms, dict) and isinstance(pms.get('chrome-devtools'), dict):
+                hits.append(pms['chrome-devtools'])
+    return hits
+
+def rebuild(args):
+    # Drop existing connection flags (and --browserUrl's value); keep the package
+    # spec at index 0 and every other flag the user has set; then append the new one.
+    out, skip = [], False
+    for a in args:
+        if skip:
+            skip = False; continue
+        if a == '--autoConnect':
+            continue
+        if a == '--browserUrl':
+            skip = True; continue
+        out.append(a)
+    if mode == 'copied':
+        out += ['--browserUrl', f'http://127.0.0.1:{port}']
+    else:
+        out += ['--autoConnect']
+    return out
+
+hits = collect(d)
+if not hits:
+    print("no chrome-devtools MCP server found — add one first (see `cdp-chrome config`).",
+          file=sys.stderr)
+    sys.exit(3)
+for srv in hits:
+    srv['args'] = rebuild(srv.get('args') or [])
+
+s = json.dumps(d, indent=2, ensure_ascii=False)
+open(path, 'w', encoding='utf-8').write(s)
+# Validate: re-parse what we just wrote; on any failure restore the backup.
+try:
+    json.load(open(path, encoding='utf-8'))
+except Exception as e:
+    import shutil; shutil.copyfile(backup, path)
+    print(f"edit produced invalid JSON ({e}); restored from backup.", file=sys.stderr)
+    sys.exit(1)
+PY
+  then
+    echo "switched chrome-devtools-mcp to '$want' mode in $CLAUDE_CONFIG (backup: $backup)"
+    echo "Reconnect the MCP: run /mcp in Claude Code (or restart the MCP host) to apply it."
+    if [ "$want" = "copied" ]; then
+      echo "Reminder: copied mode attaches to the dedicated Chrome — make sure it's up:"
+      echo "  cdp-chrome start   (seed once with: cdp-chrome reseed)"
+    else
+      echo "Reminder: autoconnect drives your REAL Chrome and pops 'Allow remote debugging?'"
+      echo "each session. To auto-click it (EXPERIMENTAL):  cdp-chrome allow-watch"
+    fi
+    exit 0
+  else
+    echo "mode switch failed — $CLAUDE_CONFIG left unchanged (backup: $backup)." >&2
+    exit 1
+  fi
+}
+
+# allow-watch — EXPERIMENTAL, autoconnect-mode helper.
+#   chrome-devtools-mcp --autoConnect makes Chrome 144+ pop a native, un-suppressible
+#   "Allow remote debugging?" bubble every session; Google closed the persistence request
+#   (chrome-devtools-mcp#825) "not planned". The ONLY way to keep autoConnect from blocking
+#   is to click that dialog for you. This runs a BOUNDED macOS-accessibility loop (System
+#   Events) that watches for Google Chrome's "Allow" button and clicks it — clicking every
+#   match each pass because a known bug (#1794) can stack several dialogs. It is a fragile
+#   workaround of last resort, NOT a supported Chrome mechanism. Needs a one-time
+#   Accessibility + Automation grant for whatever runs osascript (Terminal / Claude).
+CLICK_SCRIPT='on run
+  set clickedCount to 0
+  try
+    tell application "System Events"
+      if not (exists process "Google Chrome") then return "no-chrome"
+      tell process "Google Chrome"
+        with timeout of 4 seconds
+          repeat with w in windows
+            try
+              repeat with el in (entire contents of w)
+                try
+                  if (role of el is "AXButton") and (name of el is "Allow") then
+                    click el
+                    set clickedCount to clickedCount + 1
+                  end if
+                end try
+              end repeat
+            end try
+          end repeat
+        end timeout
+      end tell
+    end tell
+  on error errMsg number errNum
+    return "error:" & errNum & ":" & errMsg
+  end try
+  return "clicked:" & clickedCount
+end run'
+
+allow_watch() {
+  command -v osascript >/dev/null 2>&1 || { echo "osascript not found (macOS only)." >&2; exit 1; }
+  echo "cdp-chrome allow-watch (EXPERIMENTAL): watching for Chrome's 'Allow remote debugging?'"
+  echo "dialog for ${WATCH_SECONDS}s and clicking Allow. Trigger your autoConnect CDP call now."
+  # Preflight one pass: surfaces missing Accessibility/Automation permission immediately
+  # instead of failing silently for the whole window. Both are needed — Automation to talk
+  # to System Events, Accessibility to read/click other apps' UI elements.
+  local out rc
+  out="$(osascript -e "$CLICK_SCRIPT" 2>&1)"; rc=$?
+  if [ $rc -ne 0 ] || printf '%s' "$out" | grep -Eq -- '-1743|-25211|not allowed|Not authorized'; then
+    echo "" >&2
+    echo "Accessibility/Automation permission is not granted for whatever runs osascript." >&2
+    echo "osascript said: $out" >&2
+    echo "Grant it ONCE, then re-run:" >&2
+    echo "  System Settings → Privacy & Security → Accessibility  → enable your terminal" >&2
+    echo "  System Settings → Privacy & Security → Automation      → allow it to control" >&2
+    echo "                                                          'System Events'" >&2
+    echo "(whatever process launches this — Terminal / iTerm / Ghostty / the Claude app)." >&2
+    exit 1
+  fi
+  # Bounded poll: ~1 pass/sec up to WATCH_SECONDS. Keep clicking every pass (stacked-dialog
+  # bug #1794). Stop early once we've clicked at least one AND then see 3 clean passes.
+  local total=0 clean=0 i
+  for i in $(seq 1 "$WATCH_SECONDS"); do
+    out="$(osascript -e "$CLICK_SCRIPT" 2>/dev/null)"
+    case "$out" in
+      clicked:0|no-chrome) [ "$total" -gt 0 ] && clean=$((clean+1)) ;;
+      clicked:*)
+        n="${out#clicked:}"; total=$((total+n)); clean=0
+        echo "clicked Allow x$n (total $total)" ;;
+      *) : ;;  # timeout / transient a11y hiccup — ignore, retry next tick
+    esac
+    [ "$total" -gt 0 ] && [ "$clean" -ge 3 ] && break
+    sleep 1
+  done
+  if [ "$total" -gt 0 ]; then
+    echo "done: clicked Allow $total time(s)."
+  else
+    echo "done: no 'Allow' dialog appeared in ${WATCH_SECONDS}s (nothing clicked)."
+    echo "If the prompt never showed, autoConnect may not have been triggered, or the button"
+    echo "label/locale differs. This helper is best-effort — see SKILL.md caveats."
+  fi
+}
+
 case "${1:-start}" in
   start)  start ;;
   reseed) reseed ;;
   status) is_up && echo "up on :$PORT" || echo "down" ;;
   config) config ;;
-  -h|--help|help) sed -n '2,40p' "$0" ;;
-  *) echo "usage: cdp-chrome {start|reseed|status|config}"; exit 2 ;;
+  mode)   mode "${2:-}" ;;
+  allow-watch) allow_watch ;;
+  -h|--help|help) sed -n '2,52p' "$0" ;;
+  *) echo "usage: cdp-chrome {start|reseed|status|config|mode|allow-watch}"; exit 2 ;;
 esac
