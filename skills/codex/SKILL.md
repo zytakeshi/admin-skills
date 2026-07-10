@@ -1,6 +1,6 @@
 ---
 name: codex
-description: "Use OpenAI Codex CLI for code review, design consultation, bug investigation, and second opinions. Triggers on /codex, 'codex', 'code review', 'review this', 'check this code', 'security audit', 'performance review', 'ask codex', 'consult codex', 'second opinion'. Use cases: (1) Code review (2) Design consultation (3) Bug investigation (4) Hard-to-solve problems (5) Second opinion (6) Security audit (7) Performance analysis. Streams events as they arrive, captures the final answer to a per-invocation result file, and surfaces cross-cutting integration findings (lifecycle ordering, error contracts, state-emit races) beyond the diff itself."
+description: "Use OpenAI Codex CLI for code review, design consultation, bug investigation, and second opinions. Triggers on /codex, 'codex', 'code review', 'review this', 'check this code', 'security audit', 'performance review', 'ask codex', 'consult codex', 'second opinion'. Use cases: (1) Code review (2) Design consultation (3) Bug investigation (4) Hard-to-solve problems (5) Second opinion (6) Security audit (7) Performance analysis (8) Delegated implementation — when asked to have codex implement/fix/apply a change, run it in implementer mode (--sandbox workspace-write), not read-only. Streams events as they arrive, captures the final answer to a per-invocation result file, and surfaces cross-cutting integration findings (lifecycle ordering, error contracts, state-emit races) beyond the diff itself."
 ---
 
 You are a bridge between Claude Code and OpenAI Codex CLI. Your role is to take the user's request, construct the appropriate Codex command, execute it, and report the results.
@@ -24,6 +24,13 @@ Determine the mode from the user's request:
 | **Performance** | "performance", "optimize" | N+1 queries, algorithms, memory, DB |
 | **Architecture** | "architecture", "design" | Patterns, SOLID, coupling, scalability |
 | **Bug Investigation** | "bug", "investigate" | Root cause analysis, fix proposals |
+| **Implementer** | "implement", "fix it", "make the change", "apply the fix", "write the code", or the calling session explicitly delegates implementation to codex | Codex writes/edits code in the project |
+
+**Sandbox follows the mode.** Review/consult/investigation modes run `--sandbox read-only` (codex must not touch the codebase). **Implementer mode runs `--sandbox workspace-write`** — when the user or calling session has asked codex to implement, do NOT run it read-only and do NOT let it "report what it would change" instead of changing it. Everything else in this skill (guard script, TASK_ID, `--json`, stdin closing, hang recovery) is identical in both modes; only the `--sandbox` value changes. Implementer-mode extras:
+- Add to the prompt: scope (which files/dirs it may touch), "make the changes directly — do not just describe them", and guardrails: no `git commit`/`push`, no `rm`, no touching files outside the stated scope, no prod credentials/deploys.
+- `workspace-write` confines writes to the `--cd` project directory — that is the safety envelope replacing read-only. Never use `danger-full-access` here (that's `/codex-test`'s browser-driving exception).
+- After completion, run `git status`/`git diff` and review the diff yourself before reporting it done. Codex's edits are unverified output until you've read them.
+- ⛔ Mission-critical work (prod deploys, billing, certs, DNS, fleet state) never goes to codex implementer mode — per global model routing, that stays with Opus/you.
 
 ### Step 2: Gather Context
 
@@ -45,7 +52,7 @@ After constructing the codex command in Step 3 (points 1–4: prompt, probes, `T
 
 ```bash
 bash ~/.claude/skills/codex/scripts/codex-guard.sh <TASK_ID> 1800 -- \
-  codex exec --json --sandbox read-only --skip-git-repo-check \
+  codex exec --json --sandbox <read-only|workspace-write> --skip-git-repo-check \
   -c model_reasoning_effort=xhigh -c service_tier="fast" \
   --cd <project_directory> -o /tmp/codex_result_<TASK_ID>.txt "<constructed_prompt>"
 ```
@@ -90,9 +97,9 @@ When the completion notification arrives, read the guard's output / `/tmp/codex_
    - Example: `TASK_ID=review_staged_20260513_143022` → `/tmp/codex_result_review_staged_20260513_143022.txt` and `/tmp/codex_events_review_staged_20260513_143022.jsonl`.
 5. **Run in the background with `--json` so every event streams as JSONL.** `-o` still captures the final message, but stdout is NOT redirected — it becomes the progress stream that Monitor can tail.
    ```bash
-   codex exec --json --sandbox read-only --skip-git-repo-check -c model_reasoning_effort=xhigh -c service_tier="fast" --cd <project_directory> -o /tmp/codex_result_<TASK_ID>.txt "<constructed_prompt>" </dev/null
+   codex exec --json --sandbox <read-only|workspace-write> --skip-git-repo-check -c model_reasoning_effort=xhigh -c service_tier="fast" --cd <project_directory> -o /tmp/codex_result_<TASK_ID>.txt "<constructed_prompt>" </dev/null
    ```
-   - **NEVER pass `--full-auto`** — it's deprecated in codex >=0.130 and the combination `--json + --full-auto` reliably hangs codex at "Reading additional input from stdin..." with zero JSONL events emitted (observed 35+ minute hangs). Codex's sandbox is already constrained by `--sandbox read-only`, so `--full-auto` adds nothing here.
+   - **NEVER pass `--full-auto`** — it's deprecated in codex >=0.130 and the combination `--json + --full-auto` reliably hangs codex at "Reading additional input from stdin..." with zero JSONL events emitted (observed 35+ minute hangs). The `--sandbox` flag already constrains codex, so `--full-auto` adds nothing here.
    - **Always close stdin with `</dev/null`** — without it, codex sits on its stdin reader and may stall indefinitely when stdout is piped through `tee` or another consumer. Closing stdin is a no-op when codex doesn't need it and prevents the hang when it does.
    - **Always** set `run_in_background: true` on the Bash call.
    - Use a generous timeout (up to 10 minutes / 600000ms) for large codebases.
@@ -202,7 +209,7 @@ For non-review tasks (consulting, bug investigation), summarize findings natural
    pkill -9 -f "codex_result_${TASK_ID}" 2>/dev/null; pkill -9 -f "codex_events_${TASK_ID}" 2>/dev/null
    ```
    Prefer `TaskStop` on the background Bash task by its task id, and `TaskStop` any Monitor task so it stops firing. Only fall back to the blunt `pkill -9 -f "codex exec"` if no `TASK_ID`-scoped process can be identified **and** you've confirmed no other codex run is in flight.
-2. **Retry once, correctly** — via this skill's canonical invocation: background, `--json`, `--sandbox read-only`, `--skip-git-repo-check`, `-o /tmp/codex_result_<TASK_ID>.txt`, and **`</dev/null`**. In practice just adding `</dev/null` fixes it. Do NOT shell out with a bare `codex exec … | tee` and no stdin redirect — that is what hung.
+2. **Retry once, correctly** — via this skill's canonical invocation: background, `--json`, the mode's `--sandbox` value, `--skip-git-repo-check`, `-o /tmp/codex_result_<TASK_ID>.txt`, and **`</dev/null`**. In practice just adding `</dev/null` fixes it. Do NOT shell out with a bare `codex exec … | tee` and no stdin redirect — that is what hung.
 3. **If it hangs a second time, stop fighting codex** (the guard reports this as `STATUS: FAILED`). Fall back to a Claude-native review — yourself or a fresh **Opus** reviewer over the same diff (review is judgment work; never Haiku/Sonnet) — so the user still gets a thorough review, and tell them codex was unavailable and that they can run it themselves interactively via `! codex …` (interactive codex doesn't hit the headless stdin hang).
 
 The cardinal rule: a hung codex must never silently block the task. Detect → kill → retry-with-`</dev/null` → fall back. Prefer invoking codex through **this skill** (or the `Skill` tool) rather than hand-rolling `codex exec`, precisely so stdin is closed and the recovery path is consistent.
@@ -212,10 +219,10 @@ The cardinal rule: a hung codex must never silently block the task. Detect → k
 | Parameter | Value | Purpose |
 |-----------|-------|---------|
 | `--json` | (flag) | Stream events as JSONL on stdout so Monitor can surface progress |
-| `--sandbox read-only` | `read-only` | Safe mode - Codex cannot modify files |
+| `--sandbox` | `read-only` (review/consult/investigate) or `workspace-write` (implementer mode) | Read-only for reviews — Codex cannot modify files. `workspace-write` when codex is invoked as implementer — writes confined to the `--cd` project dir. Never `danger-full-access` here. |
 | `--skip-git-repo-check` | (flag) | Skip the git-repo guard so codex runs from any working directory |
 | `</dev/null` (stdin) | shell redirect | Close stdin — required to prevent "Reading additional input from stdin..." hang |
-| ~~`--full-auto`~~ | DO NOT USE | Deprecated in codex 0.130+; combined with `--json` it hangs the process. `--sandbox read-only` already gives the non-interactive behavior we want. |
+| ~~`--full-auto`~~ | DO NOT USE | Deprecated in codex 0.130+; combined with `--json` it hangs the process. The `--sandbox` flag already gives the non-interactive behavior we want. |
 | `-c model_reasoning_effort` | `xhigh` | Keep reasoning effort maxed out — fast mode speeds up tokens, not thinking |
 | `-c service_tier` | `"fast"` | **Always enable Codex fast mode** — lower latency service tier, no quality downgrade |
 | `--cd` | project directory | Target directory for analysis |
@@ -223,7 +230,7 @@ The cardinal rule: a hung codex must never silently block the task. Detect → k
 
 ## Important Rules
 
-- Always use `--sandbox read-only` — Codex must never modify the codebase.
+- **Sandbox follows the mode:** `--sandbox read-only` for review/consult/investigation (Codex must not modify the codebase); `--sandbox workspace-write` for Implementer mode (Codex was asked to make the change — don't run it read-only and don't let it merely describe the edit). See Step 1 for implementer guardrails; verify the resulting diff yourself before reporting done.
 - **Always pass `-c service_tier="fast"`** to force Codex fast mode (lower-latency service tier). Never drop reasoning effort below `xhigh` to "go faster" — use fast mode instead.
 - If `$ARGUMENTS` is empty or only contains "review" with no further description, **default to reviewing all uncommitted changes** (run `git diff` + `git diff --staged` to gather context).
 - **Always run in background via `codex-guard.sh`** (Step 2.5). Do not add a `Monitor` by default — the guard's single completion notification is the signal, and per-event Monitor notifications spam the calling session. Use the Step 6 Monitor tail only when the user explicitly wants live progress. Never redirect codex stdout to `/dev/null` (the guard captures it to the events file for post-mortems).
