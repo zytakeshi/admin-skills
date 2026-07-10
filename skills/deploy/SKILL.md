@@ -25,6 +25,21 @@ If any parameter is unknown, ask the user. Don't guess server addresses or remot
 
 **Multi-server:** If the user mentions multiple servers or a load-balanced setup, confirm the full server list upfront. Deploy to each server sequentially (not in parallel) so you can catch failures early without leaving servers in inconsistent states.
 
+**Web assets — discover the authoritative serving surface before acting.** If the deploy target is a customer-facing **web asset** (a widget script, an embed snippet, a page, a JS/CSS bundle), do NOT trust the obvious/marketing domain as the place to deploy — the asset may actually be served from a different origin (a CDN, an app subdomain, a test host). Resolve the **real serving origin** before transport:
+
+```bash
+# 1. Fetch the public page that loads the asset, following redirects, and extract the asset's actual host
+curl -sL <PUBLIC_PAGE_URL> | grep -oE '<script[^>]+src="[^"]+"' 
+
+# 2. For the specific asset, resolve where it really comes from (final URL after redirects + its DNS)
+curl -sIL <ASSET_URL> | grep -iE '^(location|HTTP)'
+dig +short <ASSET_HOST>            # confirm the host the <script src> actually points at
+```
+
+- Extract the `<script src="…">` (or `<link href>`/`<img src>`) **host** the live page truly loads from — that host, not the brand domain, is your deploy target.
+- **CONFIRM the resolved serving host with the user before transport.** State explicitly: "the page loads `widget.js` from `<resolved-host>`, deploying there — correct?" This prevents the wrong-host class of failure (e.g. deploying to `widget.example.com` while the page actually loads the asset from `cdn-test.example.com`).
+- The principle: **discover the authoritative serving surface before acting, then verify against that same surface after** (Step 8).
+
 ## Step 0.5: Pre-flight checks
 
 Before starting, verify the basics:
@@ -201,6 +216,20 @@ ssh <SSH_OPTS> <USER>@<HOST> "tail -5 /var/log/<app-error-log>"
 - If the app has a known health endpoint or URL, hit it and confirm 200
 - If no health endpoint exists, check the error log for PHP fatals, Python tracebacks, or Node crashes since the deploy timestamp
 - If the smoke test fails, alert the user immediately and offer to rollback
+
+**Verify against the authoritative serving surface (not just localhost).** Localhost-on-the-box returning 200 does NOT prove the customer sees your change — the asset may be fronted by a CDN/proxy or served from a different origin than you deployed to. For any customer-facing endpoint or web asset, also hit the **public URL** resolved in Step 0 and confirm the deployed content is actually live there:
+
+```bash
+# Fetch the PUBLIC asset/endpoint (the serving surface confirmed in Step 0), following redirects
+curl -sL <PUBLIC_ASSET_OR_ENDPOINT_URL> -o /tmp/served.out -w 'HTTP %{http_code}\n'
+
+# Prove the deployed bytes are the ones being served — compare against what you pushed
+curl -sL <PUBLIC_ASSET_URL> | wc -c          # must match the deployed file size (Step 6)
+curl -sL <PUBLIC_ASSET_URL> | grep -q '<UNIQUE_MARKER_FROM_THIS_DEPLOY>' && echo 'PUBLIC OK'
+```
+
+- Match the public-served size/content marker against the file you deployed in Steps 4–6. A 200 with **stale or wrong content** is still a failure.
+- If the public URL serves old/missing content (CDN cache, wrong origin, or — the failure this guards against — you deployed to the wrong host), treat it as a failed smoke test: trigger **Rollback** and re-resolve the serving origin per Step 0 before retrying.
 
 ## Step 9: Report
 
