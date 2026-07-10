@@ -106,7 +106,24 @@ Partition by assigning **specific directories or file lists** to each agent. Kee
 
 Adjust dynamically based on the actual `--target` and what files exist. The goal is **even coverage with no gaps and no overlap**.
 
-### 2.2 Spawn All Agents in One Turn
+### 2.2 Cost / Scope Gate (STOP — get go/no-go before spawning)
+
+**Before spawning anything, state the plan and wait for explicit approval.** Fleet review fans out many concurrent agents on Opus — this is expensive and must never launch unprompted. (Real incident: 32 verifiers + 10 lanes launched on Opus with no confirmation — "wow pause that".)
+
+Post a one-block estimate, then **STOP and ask the user for a go/no-go**:
+
+```
+FLEET REVIEW — COST/SCOPE GATE
+Agents:      <N>  (partitioned over <M> dirs/file-lists)
+Model:       <opus | sonnet>
+Depth:       <quick | medium | deep>
+Est. tokens: ~<X>M total (~<Y>k/agent)
+Proceed? (go / no-go)
+```
+
+Rough sizing: tokens ≈ agents × (scope files × ~2k read + prompt/overhead); deep depth multiplies per-agent cost. Do **not** call the Agent tool until the user says go. If they want fewer agents, a cheaper model, or a narrower target, re-state the gate before spawning.
+
+### 2.3 Spawn All Agents in One Turn
 
 **Spawn all agents simultaneously in a single message.** Use the `Agent` tool (or your harness's equivalent) with a code-reading agent type for each. These are read-only sub-agents — inline is correct here.
 
@@ -136,7 +153,7 @@ Each agent gets a prompt like:
 > - If a file is clean, say "SCOPE CLEAN: <file>" so I know you checked it.
 > - End your report with a one-line summary: "Found N issues across M files."
 
-### 2.3 While Agents Run — Prepare Report Template
+### 2.4 While Agents Run — Prepare Report Template
 
 While waiting for agents to complete, prepare the consolidation structure. Don't sit idle.
 
