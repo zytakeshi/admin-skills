@@ -22,6 +22,7 @@ Claude Code 向けのシステム管理・DevOps スキル集です。デプロ�
 - **`/ask-grok`** — 既存の X Premium / SuperGrok サブスクリプション（APIキー不要）で Grok（xAI）にリアルタイムの Web・X/Twitter 情報を照会。「最新の〜は？」「速報」「ツールの最新バージョン」「Xで〜について何と言われている？」を公式 Grok CLI 経由で Grok にルーティングし、回答をソースリンク付きでそのまま表示。
 - **`/cdp-chrome`** — Chrome 136+ で Chrome DevTools（CDP）ブラウザ自動化を**無人で**実行。専用のログイン済み Chrome インスタンスに `--browserUrl` で接続するため、「Allow remote debugging?」のネイティブ許可ダイアログが一切出ず、`chrome-devtools-mcp` / Puppeteer / Playwright が接続時にハングしなくなる。`cdp-chrome` ヘルパー（start / reseed / status / config）を同梱。macOS。
 - **`/fable5`** — フロンティア級モデル（Claude の Fable 5 など）のセッションを有効に使うためのガイド。ある作業が "one-way door"（後戻りにコストがかかる決定）としてフロンティア級を使う価値があるか判断し、セッション前にコンテキストを圧縮し、フロンティアモデルに唯一の統治アーティファクト——下流の作業が最も依存する耐久的な決定・仕様・枠組み（データモデルやAPI契約はもちろん、PRD・検証ルーブリック・分類体系・リサーチ計画・ポリシーなども）——を書かせてから、実装と検証を安価なフリート（`/codex` + `/codexloop` があればそれと、なければ同等のツールと）に引き継ぐ。
+- **`/loop-builder`** — 「これを定期実行ジョブにしたい」から、きちんとハードニングされた無人ループへと導くガイド。スクリプトとエージェントどちらをワーカーにするか、cron / launchd / systemd タイマー / スケジュール済みエージェントのどれを監督者にするかを選び、セキュリティ契約付きのループ仕様を書き、ロック・冪等性・可観測性を備えたドライラン優先の実装を行い、有効化前にロールバックを用意し、事前登録したエビデンスゲートで検証しながらソーク運用（実データでの様子見運用）を行い、高リスクな自動化には人間の承認を伴う監査可能な arm トランザクションで変更系ループを稼働させる。デフォルトは静か——ページ通知は人間の即時対応が必要な障害のときだけ。
 
 > **注意（2026年3月31日）:** Codex コードレビューは専用枠ではなく、通常の Codex 使用量にカウントされるようになりました。コードレビューを多用すると、Codex の全体制限に早く達する場合があります。詳細は [OpenAI の告知](https://chatgpt.com/codex)を参照してください。
 
@@ -48,6 +49,7 @@ npx skills add zytakeshi/admin-skills@finish-translation
 npx skills add zytakeshi/admin-skills@ask-grok
 npx skills add zytakeshi/admin-skills@cdp-chrome
 npx skills add zytakeshi/admin-skills@fable5
+npx skills add zytakeshi/admin-skills@loop-builder
 ```
 
 ## 利用可能なスキル
@@ -68,6 +70,7 @@ npx skills add zytakeshi/admin-skills@fable5
 | [ask-grok](skills/ask-grok/) | 公式 Grok CLI（サブスク OAuth、APIキー不要）で Grok（xAI）にリアルタイム Web・X/Twitter 情報を照会 — 最新リリース、速報、Xの反応を、ソースリンク付きでそのまま表示 |
 | [cdp-chrome](skills/cdp-chrome/) | Chrome 136+ で Chrome DevTools（CDP）自動化を無人実行 — `--browserUrl` で専用のログイン済み Chrome に接続し、「Allow remote debugging?」ダイアログを根絶。`cdp-chrome` ヘルパー（start / reseed / status / config）同梱。macOS |
 | [fable5](skills/fable5/) | フロンティア級モデルのセッションを有効に使うためのガイド — one-way-door 判定、コンテキストパック圧縮、サブエージェントとして呼び出して戻す運用、安価なフリート（`/codex` + `/codexloop` など）への引き継ぎ |
+| [loop-builder](skills/loop-builder/) | 無人自動化ループ（cron / launchd / systemd タイマー / スケジュール済みエージェント / デーモン）の設計・構築・テスト・ソーク・安全な稼働化 — ワーカー/スーパーバイザー選定、セキュリティ契約、ドライラン優先、ロールバック準備、エビデンスゲート付きソーク、監査可能な arm トランザクション |
 
 ## 使い方
 
@@ -87,6 +90,7 @@ npx skills add zytakeshi/admin-skills@fable5
 - `/ask-grok` — Grok からライブ Web・X 情報を取得し、ソース付きでそのまま表示
 - `/cdp-chrome` — 無人の Chrome DevTools 自動化をセットアップ（専用のログイン済み Chrome、許可ダイアログなし）
 - `/fable5` — その作業がフロンティア級モデルのセッションに値するか判断し、有効に使い、安価なフリートに引き継ぐ
+- `/loop-builder` — 定期実行の自動化ループを設計・ハードニングし、安全に稼働させる
 
 ## 関連プロジェクト
 

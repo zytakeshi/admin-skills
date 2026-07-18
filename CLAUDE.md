@@ -28,6 +28,7 @@ Each skill is a `SKILL.md` file inside `skills/<skill-name>/`, with YAML frontma
 | `skills/ask-grok/` | Consult Grok (xAI) for real-time web + X/Twitter knowledge via the official Grok CLI (subscription OAuth, no API key); bundles `scripts/ask_grok.sh` (handles `--always-approve`, retry, JSON output, search+cite default) |
 | `skills/cdp-chrome/` | Run Chrome DevTools (CDP) browser automation unattended on Chrome 136+ — attach a CDP client (chrome-devtools-mcp/Puppeteer/Playwright) to a dedicated, logged-in Chrome via `--browserUrl` so the "Allow remote debugging?" dialog never appears; bundles `scripts/cdp-chrome` (start/reseed/status/config). macOS |
 | `skills/fable5/` | Guide for spending a frontier-tier model session (e.g. Claude's Fable 5) well: one-way-door test, context-pack compression, spawn-as-sub-agent-then-return pattern, handoff to your cheap fleet for implementation and verification (pairs with `/codex` + `/codexloop`, or any equivalent) |
+| `skills/loop-builder/` | Design, build, test, soak, and safely arm unattended automation loops (cron/launchd/systemd timers/scheduled agents/daemons) — worker/supervisor selection, security contract, dry-run-first, rollback prep, evidence-gated soak, auditable arm transaction |
 
 ## Skill Authoring Conventions
 
