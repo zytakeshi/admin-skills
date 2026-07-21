@@ -11,7 +11,7 @@ $ARGUMENTS
 
 ## Why this exists
 
-A single `/codex` pass finds issues but doesn't fix them. A single fix pass addresses today's findings but may introduce new ones, or may miss things that only become visible after the first round of edits. The loop closes that gap: review → fix → re-review → fix → … until codex stops finding things you consider real problems. Two agreeing models converging on "looks good" is a stronger signal than either one alone.
+A single `/codex` pass finds issues but doesn't fix them. A single fix pass addresses today's findings but may introduce new ones, or may miss things that only become visible after the first round of edits. The loop closes that gap: review → fix → re-review → fix → … until codex stops finding things you consider real problems. Two agreeing models converging on "looks good" is a stronger *static* signal than either one alone — it is not a substitute for exercising the changed behavior (DB semantics, transactions, auth, payments only fail for real when executed).
 
 The loop is not "keep going until codex has zero complaints no matter how petty." It's "keep going until both of you are honestly satisfied." Those are different things — codex can always find something to nitpick, and endless iteration on style or micro-optimizations burns time and tokens without improving the code. Your job is to recognize when further iteration stops adding value.
 
@@ -31,7 +31,7 @@ Scope rules:
 - If there are no uncommitted changes but the current branch is ahead of main, review the branch diff: `args: "review my branch vs main"`.
 
 On iterations 2+, include a short note to codex about what changed since the last round, so it doesn't just repeat itself. Example:
-> "This is iteration N of a review loop. Last round you flagged A, B, C. I fixed A and B. I disagreed with C because <one-sentence reason> — please re-examine that finding or drop it. Review the current state."
+> "This is iteration N of a review loop. Last round you flagged A, B, C. I fixed A and B. I disagreed with C because <one-sentence reason>. Re-examine C independently against the current code; if you still believe it's real, keep flagging it and say why that reason is wrong — do not drop it just because I disagreed. Review the current state."
 
 ### Phase B — Triage
 
@@ -79,14 +79,15 @@ If a fix turns out to be harder than expected (e.g. it requires a refactor codex
 - Scope the fix down to the safe, local part, note the rest as unresolved, and move on; or
 - Escalate to the user with the tradeoff.
 
-If something fast and already-configured can validate your fixes (type check, linter, single test file), run it. Skip long full test suites unless the user asked for them.
+If something fast and already-configured can validate your fixes (type check, linter, single test file), run it. Skip long full test suites unless the user asked for them — except the mission-critical independent check required by Phase D exit condition 1, which overrides this skip.
 
 ### Phase D — Decide
 
 Exit the loop when **any** of these is true:
 
 1. Codex's latest review is clean — no findings, or only "looks good" commentary.
-2. Every remaining finding is one you already disagreed with on a prior iteration, and codex is repeating itself — you've reached a stable impasse.
+   **Mission-critical carve-out** (the Phase B critical-path scope: payments/billing, auth, certs, security headers, prod deploys): a clean review alone does not exit. Also require one independent check that exercises the changed invariant/boundary — prefer the relevant tests or a behavioral verification (the smallest meaningful integration check is enough); a fresh reviewer pass with no loop history is a fallback only when nothing executable exists, and is weaker evidence. If the check fails, fix and keep looping. If nothing independent is runnable, exit anyway but name the residual risk explicitly in the report — never present a clean review as verified.
+2. Every remaining finding is one you already disagreed with on a prior iteration, and codex is repeating itself — you've reached a stable impasse. (The same finding returning with a new rationale still counts as repetition after one honest re-triage — don't re-litigate forever.)
 3. You made no edits this round AND codex's findings are substantively the same as last round — you're stuck, not progressing.
 4. The remaining findings are all low-value (style, micro-optimization, speculative refactors) and further iteration isn't justified. Say so explicitly in the final report rather than silently deciding.
 
@@ -108,7 +109,9 @@ When the loop exits, give the user a tight summary:
 **Unresolved** (L items, if any):
 - <file:line> — <finding> — <why deferred: needs user call / scope creep / etc.>
 
-**Exit reason**: clean review | stable impasse | max iterations | no progress | diminishing returns
+**Verification**: none | <test/behavioral check that ran> | residual risk: <named, if nothing runnable>
+
+**Exit reason**: clean review | clean review + verified | stable impasse | no progress | diminishing returns
 ```
 
 The user wants to know what changed, what's still open, and why the loop stopped — not a replay of every codex message.
@@ -121,6 +124,7 @@ The user wants to know what changed, what's still open, and why the loop stopped
 - **Preserve the user's intent.** If codex wants to refactor something that works and the user didn't ask for a refactor, disagree. The loop is for correctness and honest improvements, not aesthetic churn.
 - **Don't commit or push** unless the user explicitly asked. The loop edits files in place and reports; commits are the user's call.
 - **Track disagreements across iterations.** Keep a running list of findings you've disagreed with, with reasons. This is what you feed back to codex in Phase A of later iterations, and what lets you detect the "stable impasse" exit condition.
+- **No numeric grades as ship evidence.** Never ask codex for a score, and never quote one ("94/100 PASS") as justification to ship or to exit clean — in the report, in memory, or to the user. Loop outputs are findings + exit conditions; ship evidence is tests or behavioral verification. If codex volunteers a score unprompted, ignore it. (Phase B's internal `confidence` field is fine — it gates auto-apply, it is not a ship grade.)
 - **Stop early when it makes sense.** A short clean loop is better than 5 iterations of diminishing returns. Calling it done at iteration 2 with a good reason beats grinding through to iteration 5.
 - **Hang recovery is `codex-guard.sh`'s job, not yours.** The codex skill's guard script (its Step 2.5) owns launch, the startup-gate hang detection, the `TASK_ID`-scoped kill, and the one retry — do **not** run `pkill`/`TaskStop` yourself. You only react to the reported `STATUS` line: `COMPLETED`/`RECOVERED` → triage the findings; `TIMEOUT` → codex was alive but over the cap — re-run with a higher cap or narrow scope; `STALLED` → mid-run collab sub-agent wedge — re-run once making sure the no-collab preamble (codex skill Step 3 point 3) is in the prompt, then treat as `FAILED` if it recurs; `FAILED` → treat codex as unavailable and do the fallback review yourself on Opus (next bullet). (Only in explicit inline mode do you apply the codex skill's recovery directly.)
 - **If codex is unavailable** (not installed, network down, persistent errors, or it hangs a second time after recovery), fall back to your own review pass (a fresh Opus reviewer over the same diff), say so explicitly in the report, and note the user can run codex interactively via `! codex …`.
