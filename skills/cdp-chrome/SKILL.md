@@ -170,6 +170,12 @@ Override defaults via env:
 
 ## Auto-clicking the autoConnect dialog (EXPERIMENTAL — last resort)
 
+> ⛔ **Policy: `--autoConnect` is not an approved attach mode.** The global instructions require every
+> CDP client to attach via `--browserUrl http://127.0.0.1:9222` (`copied` mode). The autoconnect
+> material below is kept as **reference only** — so you recognise the dialog trap and know how to get
+> out of it — not as a mode to select. Do not run `cdp-chrome mode autoconnect` as part of normal work;
+> if a task seems to need the real live profile, use `cdp-chrome reseed` on the copied profile instead.
+
 `autoconnect` mode blocks on Chrome's un-suppressible "Allow remote debugging?" bubble every
 session (see *Two attach modes*). `cdp-chrome allow-watch` is a **workaround of last resort**,
 **not a supported mechanism**: it runs a **bounded** macOS-accessibility loop (`osascript` /

@@ -74,18 +74,20 @@ Only deploy files that actually changed. Don't deploy entire directories unless 
 
 Before overwriting anything, check that the production files haven't been manually modified since the last deployment. If nobody hot-patched the server, the production file should be identical to what was last deployed (i.e., the previous git commit's version of that file).
 
-For each file being deployed, compare the **production file size** against the **local file size from the previous commit**:
+For each file being deployed, compare the **production file's SHA-256** against the **SHA-256 of that file at the previous commit**. Never compare byte length — a hot-patch that happens to be the same size passes a `wc -c` check silently, which is exactly the outage this gate exists to prevent.
 
 ```bash
-# Get production file size
-ssh <SSH_OPTS> <USER>@<HOST> "wc -c <REMOTE_PATH>/<file>"
+# Get production file hash
+ssh <SSH_OPTS> <USER>@<HOST> "sha256sum <REMOTE_PATH>/<file>" | awk '{print $1}'
 
-# Get local file size from the commit BEFORE the changes being deployed
-git show HEAD~1:<file> | wc -c
+# Get hash of the file at the commit BEFORE the changes being deployed
+git show HEAD~1:<file> | shasum -a 256 | awk '{print $1}'
 ```
 
-- **Sizes match**: Production file is untouched since last deploy. Safe to proceed.
-- **Sizes differ**: Someone modified the file on the server. Alert the user with the size difference and ask for explicit confirmation before overwriting. Show which files diverged so they can decide whether to proceed, skip that file, or investigate.
+(On a BSD/macOS-only remote without `sha256sum`, use `shasum -a 256`; on a minimal box, `openssl dgst -sha256`.)
+
+- **Hashes match**: Production file is untouched since last deploy. Safe to proceed.
+- **Hashes differ**: Someone modified the file on the server. Alert the user and show the divergence (`diff <(ssh … "cat <REMOTE_PATH>/<file>") <(git show HEAD~1:<file>)`) so they can decide whether to proceed, skip that file, or investigate. Ask for explicit confirmation before overwriting.
 - **File doesn't exist on server**: New file, no conflict. Proceed.
 
 If any files diverge, do NOT proceed without user confirmation. Hot-patches may contain critical fixes that aren't in git yet — overwriting them silently could cause an outage.
@@ -132,17 +134,21 @@ ssh <SSH_OPTS> <USER>@<HOST> "chown <OWNER>:<GROUP> <REMOTE_PATH>/<each file>"
 
 ## Step 6: Verify
 
-Compare file sizes between local and production:
+Compare **SHA-256** between local and production — never byte size, which passes on same-length corruption:
 
 ```bash
 # Local
-wc -c <local files>
+shasum -a 256 <local files> | awk '{print $1}'
 
-# Remote
-ssh <SSH_OPTS> <USER>@<HOST> "wc -c <remote files>"
+# Remote (portable across Linux / BSD / minimal boxes)
+ssh <SSH_OPTS> <USER>@<HOST> 'for f in <remote files>; do
+    if command -v sha256sum >/dev/null; then sha256sum -- "$f"
+    elif command -v shasum   >/dev/null; then shasum -a 256 -- "$f"
+    else openssl dgst -sha256 -r "$f"; fi
+  done' | grep -Eo "[0-9a-fA-F]{64}"
 ```
 
-Sizes must match exactly. If any mismatch, alert the user immediately and do not proceed.
+Hashes must match exactly. If any mismatch, alert the user immediately and do not proceed. `wc -c` is diagnostic only — never a gate.
 
 ## Step 7: Check if cache clearing is needed
 
@@ -224,11 +230,11 @@ ssh <SSH_OPTS> <USER>@<HOST> "tail -5 /var/log/<app-error-log>"
 curl -sL <PUBLIC_ASSET_OR_ENDPOINT_URL> -o /tmp/served.out -w 'HTTP %{http_code}\n'
 
 # Prove the deployed bytes are the ones being served — compare against what you pushed
-curl -sL <PUBLIC_ASSET_URL> | wc -c          # must match the deployed file size (Step 6)
+curl -sL <PUBLIC_ASSET_URL> | shasum -a 256  # must match the deployed file's SHA-256 (Step 6)
 curl -sL <PUBLIC_ASSET_URL> | grep -q '<UNIQUE_MARKER_FROM_THIS_DEPLOY>' && echo 'PUBLIC OK'
 ```
 
-- Match the public-served size/content marker against the file you deployed in Steps 4–6. A 200 with **stale or wrong content** is still a failure.
+- Match the public-served **SHA-256**/content marker against the file you deployed in Steps 4–6. A 200 with **stale or wrong content** is still a failure.
 - If the public URL serves old/missing content (CDN cache, wrong origin, or — the failure this guards against — you deployed to the wrong host), treat it as a failed smoke test: trigger **Rollback** and re-resolve the serving origin per Step 0 before retrying.
 
 ## Step 9: Report
@@ -259,7 +265,7 @@ ssh <SSH_OPTS> <USER>@<HOST> \
 ## Safety rules
 
 - Backup before deploying is non-negotiable — the user explicitly requires this
-- Always verify file sizes match after transfer
+- Always verify SHA-256 hashes match after transfer (size alone proves nothing)
 - Always fix file ownership — scp as root creates root-owned files which break web servers
 - Never deploy `.env`, credentials, private keys, or secret files
 - Never use `rsync --delete` unless explicitly asked (it can wipe server-only files like logs and backups)

@@ -62,8 +62,11 @@ Create exactly one self-contained HTML file at: <absolute-output-path>
 Do not create a build step, package.json, framework app, image assets, or extra source files.
 Keep CSS and JS inline. Avoid external dependencies unless absolutely required; if used, pin versions and add a graceful fallback.
 Include an inline data URI favicon or equivalent so browsers do not emit a missing `/favicon.ico` console error.
+DELIVERY-CHANNEL RULE (decide BEFORE designing): if the artifact will be delivered as a FILE ATTACHMENT (Telegram, email, chat upload) rather than a hosted URL, assume the preview it opens in (iOS Quick Look — what Telegram/Mail hand HTML files to — and similar document viewers) supports NO interactivity at all: no JS, no CSS :checked/:hover tricks, no details/summary toggling, no links. The complete story must be told by the static initial state alone — before/after and this-vs-that comparisons rendered side-by-side (dual bars, ghost overlays, paired columns), NEVER gated behind a toggle/tab/slider. Interactive controls are browser-only extras, and anything they reveal must ALSO be fully visible statically. When in doubt about the channel, design for the attachment case — it is the strictly-safer superset.
+INTERACTIVE CONTROLS MUST BE RELIABLE AND SELF-EVIDENT (hard requirement): (a) attach event listeners DIRECTLY to each control element — never rely on event delegation from a container for primary controls (embedded/in-app webviews have quirky event-target behavior); (b) every control activation must produce an UNMISTAKABLE visible change — a status label/text change or clear color/mode shift, never only a subtle width or number delta the user can miss (a toggle whose only effect is 47%→42% bar widths reads as broken); (c) wrap EACH JS init routine in its own try/catch so one failure cannot disable the others; (d) reveal a JS-only control (remove `hidden`) only AFTER its listeners are attached, never before; (e) before reporting done, self-verify every control by simulating activation (dispatch a click) and asserting the expected DOM change actually happened.
+STATIC-FIRST, JS AS ENHANCEMENT ONLY (hard requirement): all text, numbers, chart bars, and diagrams must exist as static HTML/CSS in the markup — the page must be fully readable with JavaScript disabled. Many mobile viewers (iOS Quick Look, which Telegram/Mail/Files hand HTML attachments to; some in-app browsers; email clients) strip or disable JS, and a JS-rendered page shows as a blank styled background there. JS may only ADD animation (count-ups, reveals, morphs, interactivity) on top of already-visible content. Concretely: (a) never build content DOM from a JSON blob at load time — bake the content in; (b) scroll-reveal elements must NOT default to opacity:0 in plain CSS — hide them only under a `.js` class that a first-line inline script adds to <html> (`document.documentElement.classList.add('js')`), so no-JS viewers see everything; (c) bar/funnel widths get static inline width styles, JS may re-animate them; (d) interactive-only controls (toggles, replay buttons) are hidden until `.js` is present.
 Follow the html skill's standards: visual-first, before/after contrast, animated change, intuitive metaphor, plain language, responsive layout, reduced-motion support, keyboard-accessible controls, no console errors, and CJK-safe font stack when relevant.
-After writing the file, run through the html skill's defensive checklist yourself and reply with the path and a concise PASS/FAIL note per item (self-contained, no console errors, responsive, reduced-motion, favicon, keyboard-accessible, approx KB). Do not paste the full HTML.
+After writing the file, run through the html skill's defensive checklist yourself and reply with the path and a concise PASS/FAIL note per item (self-contained, no-JS full content, no console errors, responsive, reduced-motion, favicon, keyboard-accessible, approx KB). Do not paste the full HTML.
 ```
 
 If the generator is missing, not authenticated, or fails to write the file, report that clearly and retry once with a narrower prompt. If the retry still fails, fall back to the calling agent generating the single-file HTML directly and mention the failure in the final response.
@@ -79,13 +82,16 @@ grep -cE '<script[^>]*src=|<link[^>]*href=|//cdn' "$F"       # external deps →
 grep -c 'prefers-reduced-motion' "$F"                        # ≥ 1
 grep -cE 'console\.(log|error|warn)|alert\(' "$F"            # expect 0
 grep -c '<title>' "$F"                                       # 1
+# static-first: key content must exist OUTSIDE <script> (no-JS viewers like iOS Quick Look strip JS)
+grep -c "classList.add('js')" "$F"                           # ≥ 1 (.js gate for reveals)
+awk '/<script/{s=1} /<\/script>/{s=0;next} !s' "$F" | grep -c '<KEY-CONTENT-STRING>'  # ≥ 1 — a real headline/number visible outside all <script> blocks
 ```
 
 If a grep flags a concrete problem, read **only the offending region** (`grep -n '<pattern>' "$F" | head`) and make a surgical Edit. The first complete draft must come from the generator, not you.
 
 **Do NOT, by default:** read the whole HTML into context, open it in a headless browser (chrome-devtools/playwright), or take screenshots. Those pull the artifact's full token cost back into the orchestrator and defeat the entire point of delegating. Do a browser render or screenshot **only when the user explicitly asks** to verify rendering or see a preview — and even then, prefer saving the screenshot to a file and surfacing it with `SendUserFile` over inlining it.
 
-A deeper, actually-in-a-browser check still happens — just not run by you, and not before delivery. See Step 8: deliver the file, then a Sonnet watchdog sub-agent runs `/codex-test` against it and can fix issues in place.
+A deeper, actually-in-a-browser check still happens — just not run by you, and not before delivery. See Step 8: deliver the file, then a background `codex-guard.sh` job runs a direct Codex browser QA pass against it and can fix issues in place.
 
 ---
 
@@ -125,7 +131,7 @@ Before writing a line of code, lock down:
 2. **Who** is the audience? What do they already know? Are they technical?
 3. **What language?** Default to the user's language. For Chinese / Japanese / Korean, use the CJK font stack (§Tech Stack below).
 4. **One insight rule:** what is the single sentence the viewer should remember? Everything in the file serves that sentence.
-5. **Hosting?** Local file (`file://` double-click), Cloudflare Pages (wrangler), GitHub Pages, or unspecified?
+5. **Hosting / delivery channel?** Local file (`file://` double-click), Cloudflare Pages (wrangler), GitHub Pages, or **file attachment** (Telegram/email/chat)? Attachment delivery triggers the DELIVERY-CHANNEL RULE in the delegation contract: document previews (iOS Quick Look etc.) support zero interactivity, so the static initial state must carry the whole message. Unspecified → design for the attachment case.
 
 If any of these would *substantially change the design*, ask one concise round. Otherwise state your assumptions in two lines and proceed.
 
@@ -404,6 +410,8 @@ Editorial checks first — these are the point of the skill (see Core principles
 Then the technical checks:
 
 - [ ] **Self-contained:** `<style>` and `<script>` are inline; the file opens standalone.
+- [ ] **Controls verified by simulated activation:** every button/toggle/slider was activated (dispatched click/input) and the expected DOM change asserted — a control that only *looks* wired is a shipped bug. Direct per-element listeners (no container delegation for primary controls); each init in its own try/catch; control revealed only after listeners attach; activation feedback is unmistakable (status text or mode shift, not just a few-percent width change).
+- [ ] **No-JS renders full content (static-first):** with JavaScript disabled, every number, label, bar, and diagram is still visible — iOS Quick Look (Telegram/Mail/Files attachment viewer) and some in-app browsers strip JS, and a JS-rendered page shows as a blank background there. Content is baked into the markup; JS only adds animation/interactivity. Reveal elements are hidden only under a `.js` root class added by a first-line inline script — never `opacity:0` in plain CSS. Verify cheaply: `grep` that key content strings exist in the raw HTML outside any `<script>` tag.
 - [ ] **No console errors** on load and during scroll, including missing favicon 404s.
 - [ ] **Responsive:** test 320px (small phone), 768px (tablet), 1440px (desktop). Use `clamp()` for fluid type, `grid-template-columns: repeat(auto-fit, minmax(...))` for cards.
 - [ ] **`prefers-reduced-motion`:** disable heavy animation (canvas off, transforms reduced) when set.
@@ -428,35 +436,63 @@ When delivering, give the user three things, in this order:
 
 Optionally use `SendUserFile` to surface the artifact to the user proactively.
 
-**Deliver this now — don't wait for Step 8.** The watchdog QA below runs *after* this goes out, not before.
+**Deliver this now — don't wait for Step 8.** The background QA below runs *after* this goes out, not before.
 
 ---
 
-## Step 8 — Post-delivery QA: Sonnet watchdog runs `/codex-test` (best-effort)
+## Step 8 — Post-delivery QA: background Codex browser check via `codex-guard.sh` (best-effort)
 
 **Deliver first, verify second.** Step 7's deliverable goes to the user the moment the file is generated and frugally validated. Don't hold it hostage to a browser-driven test — speed is the point. If the watchdog below catches something, the user gets a short, separate follow-up moments later with the fix already applied to the same path.
 
-**Availability check (cheap, before spawning anything):**
+**Availability check (cheap, before launching anything):**
 
 ```bash
-command -v codex >/dev/null 2>&1 && echo HAVE_CODEX || echo NO_CODEX
+GUARD=~/.claude/skills/codex/scripts/codex-guard.sh
+command -v codex >/dev/null 2>&1 && [ -x "$GUARD" ] && echo HAVE_HTML_QA || echo NO_HTML_QA
 ```
 
-- **`NO_CODEX`, or the `codex-test` skill isn't available in this environment:** skip this step entirely — no watchdog, no substitute check. Note it in one clause of the Step 7 paragraph ("automated post-delivery QA skipped — codex-test not installed") and stop there. Do **not** compensate with a heavier check of your own (opening a headless browser, screenshotting) — that reintroduces the exact token cost this skill exists to avoid (see *Validate frugally* above). This add-on is best-effort, never a blocker.
-- **`HAVE_CODEX`:** proceed below. If it's ambiguous whether the `codex-test` skill itself is installed, just attempt it — the watchdog contract below already defines a clean `STATUS: SKIPPED` path if the invocation fails.
+- **`NO_HTML_QA`** (codex missing or the guard script absent): skip this step entirely — no background job, no substitute check. Note it in one clause of the Step 7 paragraph ("automated post-delivery QA skipped — HTML QA runner unavailable") and stop there. Do **not** compensate with a heavier check of your own (opening a headless browser, screenshotting) — that reintroduces the exact token cost this skill exists to avoid (see *Validate frugally* above). This add-on is best-effort, never a blocker.
+- **`HAVE_HTML_QA`:** proceed below. If it's ambiguous whether a browser driver is reachable, just attempt it — the reporting contract below already defines a clean `STATUS: SKIPPED` path if the run can't proceed.
 
-**Spawn one watchdog sub-agent** via the `Agent` tool — `model: "sonnet"`, `subagent_type: "general-purpose"`. It does not inherit this skill or this conversation, so the prompt must be fully self-contained:
+**Launch the check as a deterministic background job — never an LLM watchdog.** Waiting on a browser test is pure rules (launch, capture, report one status line), so it is a script's job: no Sonnet/Haiku/any-tier sub-agent, per the global "No LLM watchdog/monitor" rule. Run `codex-guard.sh` directly with the `Bash` tool and `run_in_background: true` — the harness re-invokes you when the guard exits, the user stays unblocked, and the browser-test event stream never enters your context.
+
+**Build the prompt in a file, then hand it over as `"$(cat "$PROMPT_FILE")"`.** The QA prompt contains backticks and quotes; typing it *literally* inside a double-quoted argv would let the shell run the backticks as command substitution. Reading it from a file into a single quoted word is safe — the substituted text is never re-parsed. (Direct stdin is not an option here: `codex-guard.sh` closes stdin on the child.)
+
+```bash
+TASK_ID=htmlqa_$(date +%Y%m%d_%H%M%S)
+PROMPT_FILE=/tmp/htmlqa_prompt_${TASK_ID}.md
+# Write the QA prompt to "$PROMPT_FILE" with the Write tool (not a heredoc).
+bash ~/.claude/skills/codex/scripts/codex-guard.sh "$TASK_ID" 900 -- \
+  codex exec --json --sandbox workspace-write --skip-git-repo-check \
+  -c service_tier=priority --cd "<output-directory>" \
+  -o "/tmp/codex_result_${TASK_ID}.txt" "$(cat "$PROMPT_FILE")"
+```
+
+The `<qa-prompt>` must be fully self-contained — codex inherits neither this skill nor this conversation:
 
 - the absolute path of the file you just delivered, and the test target `file://<absolute-path>` (a static local file — no login, no credentials, no staging URL needed),
-- the invocation instruction: *use the `Skill` tool with `skill: "codex-test"`, passing the target and the success criteria below as `args`*,
-- success criteria, lifted straight from this skill's Step 6 checklist: loads with **zero console errors/warnings** (including no missing-favicon 404), **responsive** at 320 / 768 / 1440px, `prefers-reduced-motion` honored, scroll reveals / animations actually fire, every interactive control is keyboard-reachable,
-- explicit permission to let codex-test **fix the HTML file in place** if it finds a real issue — that's the whole reason to route through codex-test instead of a read-only check,
-- and this reporting contract: *"Invoke codex-test on the target above with those success criteria. Reply with exactly one status line: `STATUS: PASS`, `STATUS: FIXED`, or `STATUS: SKIPPED`. For FIXED, add a short bullet list (what was wrong → what changed) — no full HTML, no diffs. For SKIPPED, add the one-line reason (e.g. codex-test unavailable, codex CLI errored, no browser driver). Do not ask the user anything — resolve or report, autonomously."*
+- drive the browser through the dedicated cdp-chrome instance at `127.0.0.1:9222` (`--browserUrl`), per the global browser-automation rule,
+- success criteria, lifted straight from this skill's Step 6 checklist: loads with **zero console errors/warnings** (including no missing-favicon 404), **responsive** at 320 / 768 / 1440px, `prefers-reduced-motion` honored, scroll reveals / animations actually fire, every interactive control is keyboard-reachable, **every interactive control is actually clicked/activated and the expected visible DOM change asserted** (a no-op control is a FAIL even if it renders), and the page still shows full content with JavaScript disabled,
+- explicit permission to **fix the HTML file in place** if it finds a real issue — that's why this runs `workspace-write` rather than a read-only check,
+- and this reporting contract: *"Reply with exactly one status line: `STATUS: PASS`, `STATUS: FIXED`, or `STATUS: SKIPPED`. For FIXED, add a short bullet list (what was wrong → what changed) — no full HTML, no diffs. For SKIPPED, add the one-line reason. Resolve or report autonomously; ask nothing."*
+- close with the no-collab preamble from the `codex` skill (Step 3 point 3).
 
-**On return:**
-- `STATUS: PASS` — nothing further to say; the delivered file was already correct.
-- `STATUS: FIXED` — send a short follow-up (a few lines, not a re-delivery of Step 7): what the watchdog caught and fixed. The same path now holds the corrected file.
-- `STATUS: SKIPPED` — mention briefly if the pre-flight check above hadn't already caught it.
+**Two status protocols — do not conflate them.** The guard reports whether the *run* completed (`COMPLETED` / `RECOVERED` / `TIMEOUT` / `STALLED` / `FAILED`) in `/tmp/codex_status_<TASK_ID>.txt`. Codex reports whether the *page* passed (`PASS` / `FIXED` / `SKIPPED`) in `/tmp/codex_result_<TASK_ID>.txt`. Read the guard first; only a completed run has a QA verdict at all:
+
+```bash
+guard=$(sed -n 's/^STATUS: //p' "/tmp/codex_status_${TASK_ID}.txt" | head -1)
+case "$guard" in
+  COMPLETED|RECOVERED)
+    # -E (ERE): BSD/macOS sed has no \| alternation in BRE — the BRE form silently matches nothing
+    qa=$(sed -nE 's/^STATUS: (PASS|FIXED|SKIPPED).*$/\1/p' "/tmp/codex_result_${TASK_ID}.txt" | head -1)
+    [ -n "$qa" ] || qa=SKIPPED ;;
+  *) qa=SKIPPED ;;   # TIMEOUT / STALLED / FAILED — no verdict was produced
+esac
+```
+
+- `qa=PASS` — nothing further to say; the delivered file was already correct.
+- `qa=FIXED` — send a short follow-up (a few lines, not a re-delivery of Step 7): what the check caught and fixed. The same path now holds the corrected file.
+- `qa=SKIPPED` — mention it in one clause, naming the guard status if it was not `COMPLETED`/`RECOVERED`. This add-on is best-effort, never a blocker.
 
 If the user explicitly wants to wait for QA before treating the file as final (e.g. "don't tell me it's done until it's tested"), skip the "deliver first" framing for that one request and run this step inline, before Step 7, instead.
 
@@ -484,7 +520,9 @@ cd /tmp/<project>-deploy && wrangler pages deploy . --project-name <project-slug
 **Gotcha (from real incident):** if you ran an earlier `wrangler pages deploy` from the wrong directory, the shell's `cwd` may have persisted across commands. **Always `cd` explicitly** in the same chained command, and verify the live URL serves the expected file size before claiming success:
 
 ```bash
-curl -s -o /dev/null -w '%{http_code} %{size_download}\n' https://<project-slug>.pages.dev
+curl -s -o /tmp/served.html -w '%{http_code}\n' https://<project-slug>.pages.dev
+# identity, not size: the served bytes must hash-match the file you deployed
+shasum -a 256 /tmp/served.html <file>.html | awk '{print $1}' | uniq | wc -l   # must print 1
 ```
 
 ### GitHub Pages

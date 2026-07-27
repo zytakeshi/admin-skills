@@ -1,6 +1,6 @@
 ---
 name: commit-push
-description: "Analyze all uncommitted changes, generate a comprehensive yet succinct commit message, stage, commit, and push in one step. Use this skill when the user says /commit-push, 'commit and push', 'push my changes', 'commit everything and push', 'ship it', 'save and push', or any variation requesting to commit and push changes together. Also trigger when user wants a smart commit message generated automatically."
+description: "Analyze all uncommitted changes, generate a comprehensive yet succinct commit message, stage, commit, and push in one step. Use this skill when the user says /commit-push, 'commit and push', 'push my changes', 'commit everything and push', 'save and push', or any variation requesting to commit and push changes together. Bare 'ship it' belongs to the ship-it skill; 'ship it to prod' to deploy. Also trigger when user wants a smart commit message generated automatically."
 ---
 
 # Commit & Push
