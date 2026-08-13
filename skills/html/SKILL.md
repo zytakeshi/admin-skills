@@ -91,8 +91,6 @@ If a grep flags a concrete problem, read **only the offending region** (`grep -n
 
 **Do NOT, by default:** read the whole HTML into context, open it in a headless browser (chrome-devtools/playwright), or take screenshots. Those pull the artifact's full token cost back into the orchestrator and defeat the entire point of delegating. Do a browser render or screenshot **only when the user explicitly asks** to verify rendering or see a preview — and even then, prefer saving the screenshot to a file and surfacing it with `SendUserFile` over inlining it.
 
-A deeper, actually-in-a-browser check still happens — just not run by you, and not before delivery. See Step 8: deliver the file, then a background `codex-guard.sh` job runs a direct Codex browser QA pass against it and can fix issues in place.
-
 ---
 
 ## Core principles — the five defaults you never skip
@@ -436,69 +434,9 @@ When delivering, give the user three things, in this order:
 
 Optionally use `SendUserFile` to surface the artifact to the user proactively.
 
-**Deliver this now — don't wait for Step 8.** The background QA below runs *after* this goes out, not before.
-
 ---
 
-## Step 8 — Post-delivery QA: background Codex browser check via `codex-guard.sh` (best-effort)
-
-**Deliver first, verify second.** Step 7's deliverable goes to the user the moment the file is generated and frugally validated. Don't hold it hostage to a browser-driven test — speed is the point. If the watchdog below catches something, the user gets a short, separate follow-up moments later with the fix already applied to the same path.
-
-**Availability check (cheap, before launching anything):**
-
-```bash
-GUARD=~/.claude/skills/codex/scripts/codex-guard.sh
-command -v codex >/dev/null 2>&1 && [ -x "$GUARD" ] && echo HAVE_HTML_QA || echo NO_HTML_QA
-```
-
-- **`NO_HTML_QA`** (codex missing or the guard script absent): skip this step entirely — no background job, no substitute check. Note it in one clause of the Step 7 paragraph ("automated post-delivery QA skipped — HTML QA runner unavailable") and stop there. Do **not** compensate with a heavier check of your own (opening a headless browser, screenshotting) — that reintroduces the exact token cost this skill exists to avoid (see *Validate frugally* above). This add-on is best-effort, never a blocker.
-- **`HAVE_HTML_QA`:** proceed below. If it's ambiguous whether a browser driver is reachable, just attempt it — the reporting contract below already defines a clean `STATUS: SKIPPED` path if the run can't proceed.
-
-**Launch the check as a deterministic background job — never an LLM watchdog.** Waiting on a browser test is pure rules (launch, capture, report one status line), so it is a script's job: no Sonnet/Haiku/any-tier sub-agent, per the global "No LLM watchdog/monitor" rule. Run `codex-guard.sh` directly with the `Bash` tool and `run_in_background: true` — the harness re-invokes you when the guard exits, the user stays unblocked, and the browser-test event stream never enters your context.
-
-**Build the prompt in a file, then hand it over as `"$(cat "$PROMPT_FILE")"`.** The QA prompt contains backticks and quotes; typing it *literally* inside a double-quoted argv would let the shell run the backticks as command substitution. Reading it from a file into a single quoted word is safe — the substituted text is never re-parsed. (Direct stdin is not an option here: `codex-guard.sh` closes stdin on the child.)
-
-```bash
-TASK_ID=htmlqa_$(date +%Y%m%d_%H%M%S)
-PROMPT_FILE=/tmp/htmlqa_prompt_${TASK_ID}.md
-# Write the QA prompt to "$PROMPT_FILE" with the Write tool (not a heredoc).
-bash ~/.claude/skills/codex/scripts/codex-guard.sh "$TASK_ID" 900 -- \
-  codex exec --json --sandbox workspace-write --skip-git-repo-check \
-  -c service_tier=priority --cd "<output-directory>" \
-  -o "/tmp/codex_result_${TASK_ID}.txt" "$(cat "$PROMPT_FILE")"
-```
-
-The `<qa-prompt>` must be fully self-contained — codex inherits neither this skill nor this conversation:
-
-- the absolute path of the file you just delivered, and the test target `file://<absolute-path>` (a static local file — no login, no credentials, no staging URL needed),
-- drive the browser through the dedicated cdp-chrome instance at `127.0.0.1:9222` (`--browserUrl`), per the global browser-automation rule,
-- success criteria, lifted straight from this skill's Step 6 checklist: loads with **zero console errors/warnings** (including no missing-favicon 404), **responsive** at 320 / 768 / 1440px, `prefers-reduced-motion` honored, scroll reveals / animations actually fire, every interactive control is keyboard-reachable, **every interactive control is actually clicked/activated and the expected visible DOM change asserted** (a no-op control is a FAIL even if it renders), and the page still shows full content with JavaScript disabled,
-- explicit permission to **fix the HTML file in place** if it finds a real issue — that's why this runs `workspace-write` rather than a read-only check,
-- and this reporting contract: *"Reply with exactly one status line: `STATUS: PASS`, `STATUS: FIXED`, or `STATUS: SKIPPED`. For FIXED, add a short bullet list (what was wrong → what changed) — no full HTML, no diffs. For SKIPPED, add the one-line reason. Resolve or report autonomously; ask nothing."*
-- close with the no-collab preamble from the `codex` skill (Step 3 point 3).
-
-**Two status protocols — do not conflate them.** The guard reports whether the *run* completed (`COMPLETED` / `RECOVERED` / `TIMEOUT` / `STALLED` / `FAILED`) in `/tmp/codex_status_<TASK_ID>.txt`. Codex reports whether the *page* passed (`PASS` / `FIXED` / `SKIPPED`) in `/tmp/codex_result_<TASK_ID>.txt`. Read the guard first; only a completed run has a QA verdict at all:
-
-```bash
-guard=$(sed -n 's/^STATUS: //p' "/tmp/codex_status_${TASK_ID}.txt" | head -1)
-case "$guard" in
-  COMPLETED|RECOVERED)
-    # -E (ERE): BSD/macOS sed has no \| alternation in BRE — the BRE form silently matches nothing
-    qa=$(sed -nE 's/^STATUS: (PASS|FIXED|SKIPPED).*$/\1/p' "/tmp/codex_result_${TASK_ID}.txt" | head -1)
-    [ -n "$qa" ] || qa=SKIPPED ;;
-  *) qa=SKIPPED ;;   # TIMEOUT / STALLED / FAILED — no verdict was produced
-esac
-```
-
-- `qa=PASS` — nothing further to say; the delivered file was already correct.
-- `qa=FIXED` — send a short follow-up (a few lines, not a re-delivery of Step 7): what the check caught and fixed. The same path now holds the corrected file.
-- `qa=SKIPPED` — mention it in one clause, naming the guard status if it was not `COMPLETED`/`RECOVERED`. This add-on is best-effort, never a blocker.
-
-If the user explicitly wants to wait for QA before treating the file as final (e.g. "don't tell me it's done until it's tested"), skip the "deliver first" framing for that one request and run this step inline, before Step 7, instead.
-
----
-
-## Step 9 — Hosting (optional)
+## Step 8 — Hosting (optional)
 
 If the user asks to host the page:
 
@@ -546,7 +484,7 @@ git push -u origin gh-pages
 
 ---
 
-## Step 10 — When to escalate
+## Step 9 — When to escalate
 
 If the requested page genuinely **cannot** be a single self-contained HTML file (it needs a backend, a large local dataset, proprietary auth, a server-side language), say so plainly and propose the closest self-contained approximation: mocked data, simplified scope, or a `fetch()` against a public read-only API with a graceful failure mode.
 
