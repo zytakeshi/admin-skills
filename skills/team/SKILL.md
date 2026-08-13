@@ -13,20 +13,22 @@ You are a team lead. Your job is to analyze a task, decompose it into parallel w
 - User asks to "use agents", "spin up a team", or "implement in parallel"
 - A task clearly spans 2+ independent workstreams that would benefit from parallel execution
 
-## CRITICAL: Use Agent Teams, NOT Sub-Agents
+## CRITICAL: Teammates ARE sub-agents — spawn them, then reap them
 
-**You MUST use the full Agent Teams workflow.** Do NOT just call the `Agent` tool without `team_name` — that spawns inline sub-agents, not real teammates. Agent Teams spawn separate tmux panes and run as true parallel processes.
+⚠️ **Harness note (verified 2026-08-10).** There is no longer a separate "agent team" mechanism. `TeamCreate`/`TeamDelete` do not exist in this build; `Agent`'s `team_name` is *"Deprecated; ignored. The session has a single implicit team"*; `ListAgents` describes what it returns as *"in-process subagents you spawned"*. **A `/team` teammate is a named sub-agent — nothing more.** Earlier versions of this file claimed teammates were separate tmux-pane processes and told you to shut them down with tools that no longer exist; those steps silently no-op'd, which is why teammates dangled forever.
+
+What the `name` parameter still buys you is real and is the whole point: a named sub-agent is addressable via `SendMessage` and, critically, **stoppable via `TaskStop`**. An unnamed one is not. That is why naming is mandatory below.
 
 The required workflow is:
 
-1. `TeamCreate` — creates the team and task list
-2. `TaskCreate` — creates tasks for each workstream
-3. `Agent` with **`team_name`** and **`name`** parameters — spawns real teammates in separate tmux panes
+1. `TaskCreate` — one task per workstream (no team creation step; the session has one implicit team)
+2. `Agent` with a **`name`** parameter — spawns the teammate. Do NOT pass `team_name`; it is ignored.
+3. Record every spawned agent's name/ID. You cannot dismiss what you did not record.
 4. Wait for teammate messages (they arrive automatically)
-5. `SendMessage` with `{"type": "shutdown_request"}` — gracefully shut down teammates when done
-6. `TeamDelete` — clean up team resources after all teammates confirm shutdown
+5. **`TaskStop` on each recorded agent the moment it reaches ANY terminal state** (finished, crashed, rejected, stalled, or reclaimed) — this is the dismissal. Per agent, not only at the end.
+6. `ListAgents` as the final gate — confirm none of your teammates are still listed. Any survivor gets `TaskStop` again before you report to the user.
 
-**The `team_name` parameter on the Agent tool is what makes it a real teammate vs a sub-agent. Never omit it.**
+⛔ Do NOT originate `SendMessage {"type": "shutdown_request"}` — the tool documents it as a legacy protocol and says not to originate it. ⛔ Do NOT call `TeamDelete`; it does not exist.
 
 ## Process
 
@@ -64,19 +66,15 @@ Team Plan: [task summary]
 
 Then immediately proceed to execution — do NOT wait for confirmation unless the task is ambiguous.
 
-### Step 3: Create the Team and Spawn Teammates
+### Step 3: Spawn Teammates
 
-**Step 3a: Create the team** using `TeamCreate`:
-```
-TeamCreate(team_name="descriptive-team-name", description="What this team is doing")
-```
+**Step 3a: Create tasks** using `TaskCreate` for each workstream (all in parallel). There is no team-creation step — the session has one implicit team.
 
-**Step 3b: Create tasks** using `TaskCreate` for each workstream (all in parallel).
+**Step 3b: Spawn ALL teammates simultaneously** in a single message using the `Agent` tool. Every Agent call MUST include:
+- `name` — the teammate's kebab-case name, made **run-unique** (e.g. append a short run suffix). It is both the message address and the `TaskStop` handle.
+- ⛔ Do NOT pass `team_name` — the parameter is documented as "Deprecated; ignored".
 
-**Step 3c: Spawn ALL teammates simultaneously** in a single message using the `Agent` tool. Every Agent call MUST include:
-- `team_name` — the team name from Step 3a
-- `name` — the teammate's kebab-case name (used for messaging)
-- `mode` — typically `"bypassPermissions"` for autonomous work
+**Step 3c: Record every spawned agent's returned ID immediately**, as each call returns — not in a batch afterwards. If one spawn in the parallel batch fails, the ones that already succeeded are live and must still be recorded, or they can never be dismissed. This record is the cleanup list.
 
 Each agent's prompt should contain:
 
@@ -94,7 +92,7 @@ Each agent's prompt should contain:
 **Agent prompt template:**
 
 ```
-You are the [ROLE] teammate on team "[TEAM_NAME]" implementing [TASK SUMMARY].
+You are the [ROLE] teammate on the [WORKSTREAM] workstream implementing [TASK SUMMARY].
 
 ## Your Scope
 You own these files/areas: [LIST]
@@ -117,7 +115,7 @@ You are assigned task #[N]: [TASK SUBJECT]
 
 ### Step 4: Coordinate Results
 
-Teammate messages arrive automatically — do NOT poll or check manually. After all teammates report completion:
+Teammate messages arrive automatically — do NOT poll or check manually. Proceed once every teammate has either reported OR been judged terminal per the stall rule (a crashed agent never reports; waiting for it hangs cleanup forever):
 
 1. **Review each teammate's report** — Check what they built, any issues flagged
 2. **Validate integration points** — Verify that:
@@ -130,9 +128,10 @@ Teammate messages arrive automatically — do NOT poll or check manually. After 
    - Type mismatches at boundaries
    - Missing exports
 4. **Run project-wide checks** — Execute linting, type checking, and tests across the full project (not just individual scopes)
-5. **Shutdown teammates** — Send `{"type": "shutdown_request"}` to each teammate via `SendMessage`. Wait for shutdown confirmations.
-6. **Clean up** — Call `TeamDelete` to remove team and task directories.
-7. **Report to user** — Summarize what was built, organized by teammate, and flag any issues that need human attention
+5. **Dismiss teammates** — `TaskStop` on each recorded agent, per agent, as soon as it reaches ANY terminal state. Terminal means **finished, crashed, output rejected, stalled, or you reclaimed its work** — not only "accepted". An agent whose output you decided to fix yourself is still running until you stop it.
+6. **Confirm none survive** — `ListAgents`, filtered against your recorded IDs. Any survivor gets `TaskStop` again, then re-list. If a recorded ID is still live after the retry, report shutdown **FAILED** and say so; do not claim completion.
+7. **Reconcile tasks** — any `TaskCreate` record whose agent died without reporting gets marked accordingly. Never leave it falsely pending or falsely completed.
+8. **Report to user** — Summarize what was built, organized by teammate, and flag any issues that need human attention
 
 ## Guidelines
 
@@ -161,6 +160,9 @@ Choose the decomposition strategy that best fits the work:
 
 ### Error Handling
 
-- If an agent fails or produces broken output, fix it directly rather than re-spawning the agent
+- **Cleanup runs on EVERY exit path, not just the happy one.** Success, partial failure, abandoned run, user interruption, or you deciding to finish the work yourself — the Step 5-6 dismissal still runs before you write your final message. A run that ends without it leaks teammates.
+- **Never block cleanup on a report that may never arrive.** A crashed or stalled agent never sends a completion message; waiting for "all teammates report" hangs the cleanup forever. Treat no-progress as terminal per the global stall rule and `TaskStop` it.
+- ⚠️ **Known residual leak:** a hard session kill bypasses these instructions entirely. Prompt-level cleanup cannot close that — it needs harness-level parent-death cancellation. Do not claim teammates are always reaped.
+- If an agent fails or produces broken output, `TaskStop` it first, then fix it directly rather than re-spawning the agent
 - If the task turns out to be smaller than expected (only 1 workstream), skip the team pattern and just implement it directly — don't force parallelism where none exists
 - If agents produce conflicting approaches to the same problem, pick the better one and align the other agent's output to match

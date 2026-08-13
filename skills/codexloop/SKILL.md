@@ -120,6 +120,7 @@ The user wants to know what changed, what's still open, and why the loop stopped
 
 - **Invoke codex via the `Skill` tool**, not by shelling out to `codex` yourself. The `codex` skill already handles backgrounding, event streaming, output capture, and per-task ID collision avoidance. Don't reimplement that.
 - **One codex invocation per iteration.** Don't spawn parallel codex runs; they race on output files and muddle the loop's state.
+- ⛔ **Every iteration starts a FRESH codex session. Never `/codex-reply` or `codex exec resume` inside this loop** — not to "save context", not to "let codex see its own last round". Two reasons, both fatal to the loop: (1) a resumed session defends the findings it already made instead of re-deriving them, so a clean exit would prove agreement with itself, not that the code is clean; (2) the session still holds the PRE-fix file contents, so it reviews code you already changed. Feed prior-round context the supported way — the disagreement list in the Phase A prompt.
 - **Only act on what codex actually reported.** Don't invent findings. Don't fix unrelated issues you happen to notice — mention them in the final report and leave them alone. Scope discipline is how this loop stays useful.
 - **Preserve the user's intent.** If codex wants to refactor something that works and the user didn't ask for a refactor, disagree. The loop is for correctness and honest improvements, not aesthetic churn.
 - **Don't commit or push** unless the user explicitly asked. The loop edits files in place and reports; commits are the user's call.

@@ -108,7 +108,7 @@ umask 077          # PROMPT_FILE holds injected credentials → 0600
 # Write the fully-constructed prompt (Step 1 context + Step 2 directive block) to
 # "$PROMPT_FILE" WITHOUT printing it to the terminal (use the Write tool, or a heredoc).
 codex exec --json --sandbox danger-full-access --skip-git-repo-check \
-  -c model_reasoning_effort=high -c service_tier=fast \
+  -c model_reasoning_effort=high -c service_tier=priority \
   -c mcp_servers.playwright.enabled=true \
   -c mcp_servers.chrome-devtools.tools.new_page.approval_mode=auto \
   -c mcp_servers.chrome-devtools.tools.take_snapshot.approval_mode=auto \
@@ -129,7 +129,7 @@ codex exec --json --sandbox danger-full-access --skip-git-repo-check \
 | `- < "$PROMPT_FILE"` (stdin) | Feeds the prompt from a `0600` temp file instead of an argv string, so **injected credentials never appear in `ps`/argv/telemetry**. `-` tells codex to read instructions from stdin; the file EOFs immediately, so it also **prevents the "Reading additional input from stdin…" hang** (the #1 codex wedge) — no separate `</dev/null` needed. Never pass the credential-bearing prompt as a quoted CLI argument. |
 | (no `--full-auto`) | Deprecated; hangs with `--json`. Not needed — `approval_policy="never"` already gives unattended behavior. |
 | `--json` + background + `tee` | Stream JSONL events for Monitor and capture for the post-mortem. |
-| `-c model_reasoning_effort=high` / `-c service_tier=fast` | Lower latency, no quality loss; never drop reasoning below `high` to "go faster". |
+| `-c model_reasoning_effort=high` / `-c service_tier=priority` | Lower latency, no quality loss; never drop reasoning below `high` to "go faster". |
 | `--skip-git-repo-check` / `--cd` / `-o` | Run from any dir / target dir / capture the final verdict message. |
 
 Use a **generous Bash timeout — up to `600000` ms**; e2e runs are long.

@@ -53,10 +53,11 @@ After constructing the codex command in Step 3 (points 1–4: prompt, probes, `T
 ```bash
 bash ~/.claude/skills/codex/scripts/codex-guard.sh <TASK_ID> 1800 -- \
   codex exec --json --sandbox <read-only|workspace-write> --skip-git-repo-check \
-  -c model_reasoning_effort=xhigh -c service_tier="fast" \
+  -c service_tier=priority \
   --cd <project_directory> -o /tmp/codex_result_<TASK_ID>.txt "<constructed_prompt>"
 ```
 
+- `-c service_tier=priority` is **Fast mode** (codex's model catalog advertises this tier as `{id: "priority", name: "Fast"}` — ~1.5× speed at increased usage). Always pass it; headless runs are latency-bound and the caller is blocked on the result. It does **not** change reasoning effort — never pass `-c model_reasoning_effort` to "go faster".
 - `1800` is the hard wall-clock cap in seconds (30 min). Raise it per-run for very large audits. The guard closes stdin itself — you don't need `</dev/null` here.
 - **Do NOT start a Monitor, poll, or sleep-loop.** The background task notifies you exactly once, when the guard exits — no per-event notifications spam the session. (Only if the user explicitly asks for live progress, run the Step 6 Monitor tail on the events file — the filter emits one short line per event.)
 - The `-o` path **must** use the same `<TASK_ID>` as the guard's first argument — that convention is how the guard finds the result/events files and how its scoped kill works.
@@ -87,9 +88,14 @@ When the completion notification arrives, read the guard's output / `/tmp/codex_
      3. State-emit races: does this introduce or modify a state-event emitter (broadcast, channel invoke, EventSink)? Are there sibling emitters on the same channel that could race? Are consumers tolerant of transient state flips?
    Mark each finding as either IN-DIFF or CROSS-CUTTING so the implementer can triage.
    ```
-3. Append this instruction at the end to prevent Codex from pausing to ask questions, and to prevent the collab sub-agent wedge (headless codex at xhigh spawns "collab" verifier sub-agents that can die silently and wedge the whole run on `close_agent` — observed 2026-07-09; the verifier lane has never returned useful output headlessly):
+3. Append this block at the end — it prevents Codex from pausing to ask questions, prevents the collab sub-agent wedge (headless codex at xhigh spawns "collab" verifier sub-agents that can die silently and wedge the whole run on `close_agent` — observed 2026-07-09; the verifier lane has never returned useful output headlessly), and carries the three failure-semantics invariants. **The invariants ride here on purpose:** a codex worktree may not discover the repo's instruction file at all, so any rule that only lives in `AGENTS.md`/`CLAUDE.md` can be undeliverable (observed 2026-07-31: a repo had a `CLAUDE.md` but no `AGENTS.md`, and a local policy rejection shipped as an authoritative server-verdict error code that reached end users). The preamble is the one path that always reaches the implementer:
    ```
    Work single-threaded: do NOT spawn any collaborator/verifier sub-agents or use collab tools — do the entire task yourself directly. No confirmation or questions needed. Proactively output specific proposals, fixes, and code examples.
+
+   Invariants — apply to any code you write, and flag violations in any code you review:
+     1. A new producer inherits the value's existing meaning. Before routing a failure into an existing error code / enum value / reason, read what its current consumers already do with it.
+     2. A local check never speaks for a remote authority. Local validation / policy / config / parse failures get their own distinct code; only the server, OS, or device may render a verdict about its own state.
+     3. An unnamed failure meaning is an unassigned decision. If the spec adds a check but does not say what its failure means to the user, do not pick silently — give it a distinct code and say so in your report.
    ```
 4. **Derive a task-specific ID for output paths.** Never hardcode `codex_result.txt` / `codex_events.jsonl` — multiple concurrent codex runs (parallel reviews, nested loops, retries) would clobber each other's output. Build `TASK_ID` as `<short-slug>_<timestamp>`:
    - slug: 2-4 lowercase tokens describing the task (`review_staged`, `security_auth`, `bug_login_timeout`, `ask_api_design`). Derive from the mode + main noun in the user's request.
@@ -97,8 +103,9 @@ When the completion notification arrives, read the guard's output / `/tmp/codex_
    - Example: `TASK_ID=review_staged_20260513_143022` → `/tmp/codex_result_review_staged_20260513_143022.txt` and `/tmp/codex_events_review_staged_20260513_143022.jsonl`.
 5. **Run in the background with `--json` so every event streams as JSONL.** `-o` still captures the final message, but stdout is NOT redirected — it becomes the progress stream that Monitor can tail.
    ```bash
-   codex exec --json --sandbox <read-only|workspace-write> --skip-git-repo-check -c model_reasoning_effort=xhigh -c service_tier="fast" --cd <project_directory> -o /tmp/codex_result_<TASK_ID>.txt "<constructed_prompt>" </dev/null
+   codex exec --json --sandbox <read-only|workspace-write> --skip-git-repo-check -c service_tier=priority --cd <project_directory> -o /tmp/codex_result_<TASK_ID>.txt "<constructed_prompt>" </dev/null
    ```
+   - **Always pass `-c service_tier=priority`** (Fast mode) — same as the guarded path above.
    - **NEVER pass `--full-auto`** — it's deprecated in codex >=0.130 and the combination `--json + --full-auto` reliably hangs codex at "Reading additional input from stdin..." with zero JSONL events emitted (observed 35+ minute hangs). The `--sandbox` flag already constrains codex, so `--full-auto` adds nothing here.
    - **Always close stdin with `</dev/null`** — without it, codex sits on its stdin reader and may stall indefinitely when stdout is piped through `tee` or another consumer. Closing stdin is a no-op when codex doesn't need it and prevents the hang when it does.
    - **Always** set `run_in_background: true` on the Bash call.
@@ -189,6 +196,23 @@ Present Codex's output clearly. For code reviews, organize by severity:
 
 For non-review tasks (consulting, bug investigation), summarize findings naturally.
 
+**Always end the report with the session handle**, so a follow-up can reach this exact Codex session:
+
+```
+Codex session: <TASK_ID>  (thread <first 8 chars of thread_id>)
+```
+
+Get the thread id from the events file: `grep -o '"thread_id":"[^"]*"' /tmp/codex_events_<TASK_ID>.jsonl | head -1 | cut -d'"' -f4`.
+
+**Hand off to `/codex-reply` — do this automatically, without being asked** — when the user's next message *discusses this answer* rather than requesting new work:
+
+| User's next message | Route to |
+|---|---|
+| "why did codex flag X?", "codex is wrong about Y", "that's intentional", "ask it what it meant" | **`/codex-reply`** — resumes THIS session, so codex answers with its own finding in context |
+| "review again", "re-review after my fix", "check the new code" | **`/codex` (fresh)** — a resumed session defends its old findings and still holds the OLD file contents |
+
+⛔ The moment the code changes, the session is stale: route to fresh `/codex`, never `/codex-reply`.
+
 ## Hang detection & auto-recovery (inline mode only — `codex-guard.sh` does all of this for you)
 
 `codex exec` can wedge with **zero output** and near-zero CPU, indefinitely. In the default path this whole section is implemented deterministically by `scripts/codex-guard.sh`; apply it manually only when running inline without the guard. Treat a hung codex as an expected failure mode and recover the moment you detect it — never sit waiting for a completion notification that will never arrive.
@@ -209,7 +233,7 @@ For non-review tasks (consulting, bug investigation), summarize findings natural
    pkill -9 -f "codex_result_${TASK_ID}" 2>/dev/null; pkill -9 -f "codex_events_${TASK_ID}" 2>/dev/null
    ```
    Prefer `TaskStop` on the background Bash task by its task id, and `TaskStop` any Monitor task so it stops firing. Only fall back to the blunt `pkill -9 -f "codex exec"` if no `TASK_ID`-scoped process can be identified **and** you've confirmed no other codex run is in flight.
-2. **Retry once, correctly** — via this skill's canonical invocation: background, `--json`, the mode's `--sandbox` value, `--skip-git-repo-check`, `-o /tmp/codex_result_<TASK_ID>.txt`, and **`</dev/null`**. In practice just adding `</dev/null` fixes it. Do NOT shell out with a bare `codex exec … | tee` and no stdin redirect — that is what hung.
+2. **Retry once, correctly** — via this skill's canonical invocation: background, `--json`, the mode's `--sandbox` value, `--skip-git-repo-check`, `-c service_tier=priority`, `-o /tmp/codex_result_<TASK_ID>.txt`, and **`</dev/null`**. In practice just adding `</dev/null` fixes it. Do NOT shell out with a bare `codex exec … | tee` and no stdin redirect — that is what hung.
 3. **If it hangs a second time, stop fighting codex** (the guard reports this as `STATUS: FAILED`). Fall back to a Claude-native review — yourself or a fresh **Opus** reviewer over the same diff (review is judgment work; never Haiku/Sonnet) — so the user still gets a thorough review, and tell them codex was unavailable and that they can run it themselves interactively via `! codex …` (interactive codex doesn't hit the headless stdin hang).
 
 The cardinal rule: a hung codex must never silently block the task. Detect → kill → retry-with-`</dev/null` → fall back. Prefer invoking codex through **this skill** (or the `Skill` tool) rather than hand-rolling `codex exec`, precisely so stdin is closed and the recovery path is consistent.
@@ -223,15 +247,15 @@ The cardinal rule: a hung codex must never silently block the task. Detect → k
 | `--skip-git-repo-check` | (flag) | Skip the git-repo guard so codex runs from any working directory |
 | `</dev/null` (stdin) | shell redirect | Close stdin — required to prevent "Reading additional input from stdin..." hang |
 | ~~`--full-auto`~~ | DO NOT USE | Deprecated in codex 0.130+; combined with `--json` it hangs the process. The `--sandbox` flag already gives the non-interactive behavior we want. |
-| `-c model_reasoning_effort` | `xhigh` | Keep reasoning effort maxed out — fast mode speeds up tokens, not thinking |
-| `-c service_tier` | `"fast"` | **Always enable Codex fast mode** — lower latency service tier, no quality downgrade |
+| `-c service_tier` | `priority` (always) | **Fast mode** — the catalog tier `{id: "priority", name: "Fast"}`, ~1.5× speed at increased usage. Pass it on every run; it overrides the `service_tier` in `~/.codex/config.toml` for this invocation only, leaving interactive codex untouched. `-c service_tier=fast` is a legacy alias — use `priority`. |
+| ~~`-c model_reasoning_effort`~~ | DO NOT PASS | Don't override reasoning effort — let codex use the `model_reasoning_effort` from `~/.codex/config.toml`. Speed comes from `service_tier=priority`, never from dropping reasoning effort. Change the config file if you want a different default. |
 | `--cd` | project directory | Target directory for analysis |
 | `-o` | file path | Capture the final agent message so we can read it after completion |
 
 ## Important Rules
 
 - **Sandbox follows the mode:** `--sandbox read-only` for review/consult/investigation (Codex must not modify the codebase); `--sandbox workspace-write` for Implementer mode (Codex was asked to make the change — don't run it read-only and don't let it merely describe the edit). See Step 1 for implementer guardrails; verify the resulting diff yourself before reporting done.
-- **Always pass `-c service_tier="fast"`** to force Codex fast mode (lower-latency service tier). Never drop reasoning effort below `xhigh` to "go faster" — use fast mode instead.
+- **Always pass `-c service_tier=priority` (Fast mode); never pass `-c model_reasoning_effort=...`.** Headless runs block the caller, so the speed tier is worth the extra usage — `priority` is the tier codex's own model catalog labels "Fast" (~1.5× speed). It is per-invocation, so `~/.codex/config.toml` (and the user's interactive codex) stays on its configured tier. Reasoning effort still comes from that config file — dropping it to go faster is not allowed.
 - If `$ARGUMENTS` is empty or only contains "review" with no further description, **default to reviewing all uncommitted changes** (run `git diff` + `git diff --staged` to gather context).
 - **Always run in background via `codex-guard.sh`** (Step 2.5). Do not add a `Monitor` by default — the guard's single completion notification is the signal, and per-event Monitor notifications spam the calling session. Use the Step 6 Monitor tail only when the user explicitly wants live progress. Never redirect codex stdout to `/dev/null` (the guard captures it to the events file for post-mortems).
 - **Always use `run_in_background: true`** on the Bash tool call so the user isn't blocked while Codex works. When the completion notification arrives, read `/tmp/codex_result_<TASK_ID>.txt` for the final answer and summarize it.
