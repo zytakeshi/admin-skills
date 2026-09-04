@@ -446,11 +446,9 @@ Build the key list from one of:
 
 ### 2.2 Scale Decision
 
-Before translating, decide whether to work serially or use `/team`:
-
-- **< 10 missing keys**: Translate all target files in a single pass
-- **10-50 missing keys**: Use `/team` with 3-4 agents grouped by language family
-- **50+ missing keys**: Use `/team` with 4+ agents — parallel execution saves substantial time
+Translate in a single serial pass by default. When the missing-key set is large enough
+that one pass would be slow, split the work with `/team`, one agent per language-family
+group (see 2.4) — the groups are independent, so they parallelize cleanly.
 
 ### 2.3 Translation Rules
 

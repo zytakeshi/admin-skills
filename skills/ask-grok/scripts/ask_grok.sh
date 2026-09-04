@@ -25,6 +25,11 @@
 #   default rather than something every caller must remember. Disable it (send
 #   the prompt exactly as given) with GROK_RAW=1.
 #
+# Timeout: each attempt is capped at GROK_TIMEOUT seconds (default 600). A killed
+#   attempt is NEVER emitted — Grok writes its narration first and the answer last,
+#   so a truncated run yields prose that parses as "no result" instead of failing.
+#   That silent-wrong-answer mode is why the cap is enforced loudly, not softly.
+#
 # Output:  Grok's answer on stdout, exit 0 — a JSON object by default, or the
 #          format set via GROK_FORMAT. On failure: exit 1 and a diagnostic
 #          (stdout+stderr of a final attempt) on stderr so the caller can see why.
@@ -33,6 +38,10 @@ set -u
 PROMPT="${1:?usage: ask_grok.sh \"prompt\" [model]}"
 MODEL="${2:-${GROK_MODEL:-}}"
 OUTPUT_FORMAT="${GROK_FORMAT:-json}"
+# Seconds before an attempt is killed. A live web/X query on a high-effort model
+# routinely runs 5+ minutes (a 16-site harvest measured ~300s on 2026-08-19), so
+# the old 180s ceiling truncated real answers. Raise for heavier sweeps.
+GROK_TIMEOUT="${GROK_TIMEOUT:-600}"
 
 # Append the standing search+cite default unless the caller opted out.
 if [ -z "${GROK_RAW:-}" ]; then
@@ -65,16 +74,38 @@ has_answer() {
   fi
 }
 
-for _ in 1 2; do
-  out="$(timeout 180 "$GROK_BIN" "${args[@]}" 2>/dev/null)"
+killed=0
+for attempt in 1 2; do
+  out="$(timeout "$GROK_TIMEOUT" "$GROK_BIN" "${args[@]}" 2>/dev/null)"
+  rc=$?
+  # rc 124 = the timeout killed it mid-run. Whatever landed in $out is a
+  # TRUNCATED PREFIX: Grok narrates ("I'll search X and the web...") and emits the
+  # real answer LAST, so a killed run leaves narration that looks like output but
+  # contains none of it. has_answer() cannot tell the two apart, and a caller that
+  # parses the prefix silently gets a plausible, wrong, empty result. Discard it
+  # and say so rather than passing truncation off as an answer.
+  if [ "$rc" -eq 124 ]; then
+    killed=1
+    echo "ask_grok: attempt $attempt exceeded ${GROK_TIMEOUT}s and was killed; truncated output discarded." >&2
+    continue
+  fi
+  killed=0
   if has_answer "$out"; then
     printf '%s\n' "$out"
     exit 0
   fi
 done
 
-# Two empty attempts: re-run once surfacing everything so the caller can diagnose
+# Timed out: the cause is already known, so don't burn another full window on a
+# diagnostic re-run — just say what to raise.
+if [ "$killed" -eq 1 ]; then
+  echo "ERROR: Grok exceeded ${GROK_TIMEOUT}s on every attempt and produced no complete answer." >&2
+  echo "       Raise the ceiling (e.g. GROK_TIMEOUT=1200 ask_grok.sh ...) and retry." >&2
+  exit 1
+fi
+
+# Empty (not truncated): re-run once surfacing everything so the caller can diagnose
 # (expired token → run `grok login`; network; tier gate, etc.).
 echo "ERROR: Grok returned no output after 2 attempts. Diagnostic run follows:" >&2
-timeout 180 "$GROK_BIN" "${args[@]}" 1>&2
+timeout "$GROK_TIMEOUT" "$GROK_BIN" "${args[@]}" 1>&2
 exit 1

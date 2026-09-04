@@ -13,11 +13,9 @@ You are a team lead. Your job is to analyze a task, decompose it into parallel w
 - User asks to "use agents", "spin up a team", or "implement in parallel"
 - A task clearly spans 2+ independent workstreams that would benefit from parallel execution
 
-## CRITICAL: Teammates ARE sub-agents — spawn them, then reap them
+## Teammates are sub-agents — spawn them, then reap them
 
-⚠️ **Harness note (verified 2026-08-10).** There is no longer a separate "agent team" mechanism. `TeamCreate`/`TeamDelete` do not exist in this build; `Agent`'s `team_name` is *"Deprecated; ignored. The session has a single implicit team"*; `ListAgents` describes what it returns as *"in-process subagents you spawned"*. **A `/team` teammate is a named sub-agent — nothing more.** Earlier versions of this file claimed teammates were separate tmux-pane processes and told you to shut them down with tools that no longer exist; those steps silently no-op'd, which is why teammates dangled forever.
-
-What the `name` parameter still buys you is real and is the whole point: a named sub-agent is addressable via `SendMessage` and, critically, **stoppable via `TaskStop`**. An unnamed one is not. That is why naming is mandatory below.
+A `/team` teammate is a named sub-agent. The session has one implicit team: there is no team-creation step, and `Agent`'s `team_name` is ignored. Naming is mandatory because a named sub-agent is addressable via `SendMessage` and stoppable via `TaskStop`; an unnamed one is neither, and an unstopped one dangles.
 
 The required workflow is:
 

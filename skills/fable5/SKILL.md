@@ -1,27 +1,7 @@
 ---
 name: fable5
-description: >-
-  Step-by-step guide for spending a frontier-tier model session (e.g. Claude's
-  Fable 5) well: decide whether a piece of work is a "one-way door" worth the
-  frontier tier, compress the context into a distilled pack before the session,
-  have the frontier model write the one governing artifact — the durable
-  decision, spec, contract, or framework the most downstream work depends on —
-  as a mid-flight sub-agent spawn, then return control to your main-loop model,
-  which hands off execution and verification to your cheap fleet (an
-  implementation/execution pass plus a review-and-fix loop — this collection's
-  own /codex + /codexloop skills, or whatever equivalent tooling you use),
-  escalating back to the main loop only on real ambiguity. The work is
-  domain-agnostic: the artifact might be a data model or API contract, but
-  equally a PRD, a research plan, a taxonomy, a grading rubric, an information
-  architecture, a policy, or the system prompt your fleet runs on. Use this
-  WHENEVER the user mentions Fable 5 or a frontier model tier, asks "should I
-  use the frontier model or my main model (or a cheap model) for this," wants
-  to plan/architect a one-way-door decision, asks what to spend an expensive
-  frontier session on, is prepping a frontier-model session, wants to reduce
-  main-loop-model usage, or asks how to route a task across model tiers — even
-  if they don't name a specific model but describe an expensive-to-reverse
-  decision (a data model, an API contract, a core abstraction, a spec, a
-  rubric, a policy) they want done right.
+description: "Guide for spending a frontier-tier model session (e.g. Fable 5) well: identify one-way-door work, distill context, have the frontier model author the single governing artifact (spec, contract, data model, PRD, rubric, policy), then hand execution to cheaper models via /codex + /codexloop. Use when the user mentions Fable 5 / a frontier tier, asks which model tier to use for a task, or is planning an expensive-to-reverse decision."
+
 ---
 
 # Spending a frontier-tier model session
@@ -29,7 +9,7 @@ description: >-
 ## The one idea
 
 Every model lineup has a frontier tier: most capable, most expensive, run
-rarely (for Claude Code today, that's Fable 5). A single frontier session that
+rarely. A single frontier session that
 produces the right **durable artifact** governs **thousands** of downstream
 cheap-fleet calls for the rest of the week. The cost amortizes to near-zero per
 use.
@@ -118,9 +98,10 @@ against the frontier model's rubric).
 If you're unsure, apply the metaphor: **a revolving door (walk back out freely)
 → cheap fleet. A door that locks behind you → frontier tier.**
 
-See `references/one-way-door-examples.md` for worked examples across several
-domains (not just code), and for how to build your own ranked shortlist from
-your active projects.
+For your *current* ranked shortlist of frontier-worthy work mapped to your
+active projects — plus how to refresh it — see
+`references/one-way-door-shortlist.md`. Refresh it against live memory/portfolio
+state before recommending; projects move.
 
 ## Step 1 — Pick the target
 
@@ -251,10 +232,9 @@ model, no matter how mechanical the steps look.
 
 ## Reference & template files
 
-- `references/one-way-door-examples.md` — worked examples of one-way-door vs.
-  cheap-fleet work across several domains (code, process, content, research,
-  policy), plus how to build your own ranked shortlist for your active
-  projects.
+- `references/one-way-door-shortlist.md` — your current ranked shortlist of
+  frontier-worthy candidates mapped to active projects, plus how to refresh
+  the list.
 - `assets/fable-session-brief-template.md` — how to frame a frontier session so
   it outputs a durable artifact.
 - `assets/context-pack-template.md` — the shape of the distilled context pack

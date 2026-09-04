@@ -88,7 +88,7 @@ When the completion notification arrives, read the guard's output / `/tmp/codex_
      3. State-emit races: does this introduce or modify a state-event emitter (broadcast, channel invoke, EventSink)? Are there sibling emitters on the same channel that could race? Are consumers tolerant of transient state flips?
    Mark each finding as either IN-DIFF or CROSS-CUTTING so the implementer can triage.
    ```
-3. Append this block at the end — it prevents Codex from pausing to ask questions, prevents the collab sub-agent wedge (headless codex at xhigh spawns "collab" verifier sub-agents that can die silently and wedge the whole run on `close_agent` — observed 2026-07-09; the verifier lane has never returned useful output headlessly), and carries the three failure-semantics invariants. **The invariants ride here on purpose:** a codex worktree may not discover the repo's instruction file at all, so any rule that only lives in `AGENTS.md`/`CLAUDE.md` can be undeliverable (observed 2026-07-31: a repo had a `CLAUDE.md` but no `AGENTS.md`, and a local policy rejection shipped as an authoritative server-verdict error code that reached end users). The preamble is the one path that always reaches the implementer:
+3. Append this block at the end. It stops Codex pausing to ask questions, stops the collab sub-agent wedge (headless codex spawns "collab" verifier sub-agents that can die silently and wedge the run on `close_agent`), and carries the three failure-semantics invariants. **The invariants ride here on purpose:** a codex worktree may not discover the repo's instruction file at all, so a rule that lives only in `AGENTS.md`/`CLAUDE.md` can be undeliverable. This preamble is the one path that always reaches the implementer:
    ```
    Work single-threaded: do NOT spawn any collaborator/verifier sub-agents or use collab tools — do the entire task yourself directly. No confirmation or questions needed. Proactively output specific proposals, fixes, and code examples.
 
@@ -113,7 +113,7 @@ When the completion notification arrives, read the guard's output / `/tmp/codex_
 
 6. **Stream progress with the Monitor tool.** Tail the task's output file (or any log you pipe events into) through a `jq`/`python` filter that emits one human-readable line per event, and invoke `Monitor` on that command. Each emitted line becomes a notification that you can surface to the user.
 
-   Observed event schema (codex 0.120.0, subject to change):
+   Event schema (verify against the events file if a field is missing — codex changes it between releases):
      | JSON event | User-facing update |
      |------------|--------------------|
      | `{"type":"thread.started","thread_id":...}` | "codex: session started" |

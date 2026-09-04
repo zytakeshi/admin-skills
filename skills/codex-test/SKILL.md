@@ -1,9 +1,10 @@
 ---
 name: codex-test
-description: "Offload a headless / unattended / smoke / e2e TEST RUN to the OpenAI Codex CLI running autonomously: Codex drives a browser and is allowed to FIX code/tests/config and re-run until the flow passes; Claude assembles credentials + target URLs + success criteria first, streams progress, and reports the verdict plus any code changes. Codex prefers the Playwright MCP (isolated browser it logs into itself with the supplied creds — no native dialogs, never touches your real session) and only uses the chrome-devtools MCP when the test must reuse an already-logged-in Chrome session it can't reproduce headlessly. The write-enabled, browser-driving sibling of /codex (read-only review) and /codexloop (review-fix loop). Triggers on /codex-test, 'offload this test to codex', 'have codex run the e2e/smoke test', 'run the headless/browser test unattended', 'delegate the browser e2e/smoke test', 'unattended browser test', 'headless browser test'. DO NOT use — Claude KEEPS these itself — for tests needing live log monitoring/tailing during the run, interactive debugging (breakpoints, root-causing a flaky/unknown failure), or real-device / device-like iOS/Android testing (simulators, emulators, Xcode, Maestro, TestFlight); route those to webapp-testing / playwright / maestro-e2e."
+description: "Offload an unattended headless/smoke/e2e TEST RUN to the OpenAI Codex CLI: Codex drives a browser (Playwright MCP preferred), may fix code/tests/config, and re-runs until the flow passes; Claude supplies creds, URLs, success criteria and reports the verdict. Triggers: /codex-test, 'offload this test to codex', 'unattended/headless browser test', 'delegate the e2e/smoke test'. NOT for live log-tailing, interactive debugging, or real-device iOS/Android testing (use webapp-testing / playwright / maestro-e2e)."
+
 ---
 
-You delegate a self-contained, unattended TEST RUN to the **OpenAI Codex CLI** (gpt-5.5, headless, write-enabled, browser-driving). Codex drives a browser and is allowed to FIX code to make the test pass. You assemble everything it needs up front, stream its progress, and report the verdict. This reuses the `/codex` machinery — same background-`--json`-Monitor pattern, same hang recovery — but **write-enabled and unsandboxed** (`--sandbox danger-full-access`, NOT read-only — a browser-driving run needs Chromium's normal multiprocess model, which the macOS seatbelt blocks; see Step 3) and **browser-driving**.
+You delegate a self-contained, unattended TEST RUN to the **OpenAI Codex CLI** (whatever model `~/.codex/config.toml` currently selects — never pin one here; headless, write-enabled, browser-driving). Codex drives a browser and is allowed to FIX code to make the test pass. You assemble everything it needs up front, stream its progress, and report the verdict. This reuses the `/codex` machinery — same background-`--json`-Monitor pattern, same hang recovery — but **write-enabled and unsandboxed** (`--sandbox danger-full-access`, NOT read-only — a browser-driving run needs Chromium's normal multiprocess model, which the macOS seatbelt blocks; see Step 3) and **browser-driving**.
 
 > **Browser driver, in one line: prefer Playwright, fall back to chrome-devtools only for a logged-in session.** Playwright launches its **own isolated browser** that Codex logs into with the creds you supply — it never touches the user's real Chrome, and it grants browser permissions (notifications, geolocation, clipboard…) **programmatically**, so there are no native "Allow" dialogs to click. Use chrome-devtools **only** when the test genuinely needs an **already-authenticated** Chrome session that can't be reproduced headlessly (live SSO/2FA cookies, a session the human already has open) — and know that `--autoConnect` drives the user's **real** Chrome. ⚠️ **Do not rely on computer-use to click native "Allow" dialogs in unattended `codex exec`:** computer-use app-control is gated by an MCP approval *elicitation* that is **denied** with no human present (observed: `Computer Use approval denied via MCP elicitation for app 'com.google.Chrome'`). Designing the Playwright path to avoid native dialogs entirely is what makes the run actually unattended.
 
@@ -42,7 +43,7 @@ Codex should not hunt for anything. Read the sources, extract the **concrete** v
 - **Credentials** — read the relevant `.env`, host/credential config, and any `CLAUDE.md` (which often documents where creds live), then pass the **concrete** test-account username/password/tokens/API-keys Codex needs. Never make Codex grep for secrets.
 - **Flows + success criteria** — the exact steps to exercise AND explicit, checkable definitions of "pass" (e.g. "after login, dashboard shows the user's email and `/api/me` returns 200"), plus any fixtures / test data.
 - **Scope / guardrails** — Codex MAY fix code/tests/config and re-run, but stays inside the project + staging/local. It must **NOT deploy to production or touch prod data**. Honor repo safety rules: **never `rm`** (use `mv` to back up), back up before destructive Docker ops, don't commit.
-- **Secrets hygiene** — put the constructed prompt (with the concrete credentials) in a `0600` temp file under `/tmp` (the `PROMPT_FILE` of Step 3) that is **NOT** inside the repo and **NOT** committed, and feed it to codex via stdin — never as a quoted CLI argument (argv is visible in `ps`/telemetry). Instruct Codex not to echo secrets into logs/artifacts/the result file. Never write credentials into the working tree.
+- **Secrets hygiene** — put the constructed prompt (with the concrete credentials) in a `0600` temp file under `/tmp` (the `PROMPT_FILE` of Step 3) that is **NOT** inside the repo and **NOT** committed, and pass it at call time via `"$(cat "$PROMPT_FILE")"` (Step 3) so the credentials never sit in shell history or a world-readable path. Instruct Codex not to echo secrets into logs/artifacts/the result file. Never write credentials into the working tree.
 
 > If creds are missing, or you can't determine the target URL / success criteria, **ASK before launching** — a test with no pass/fail definition is worthless.
 
@@ -107,17 +108,23 @@ PROMPT_FILE=/tmp/codex_test_prompt_${TASK_ID}.md
 umask 077          # PROMPT_FILE holds injected credentials → 0600
 # Write the fully-constructed prompt (Step 1 context + Step 2 directive block) to
 # "$PROMPT_FILE" WITHOUT printing it to the terminal (use the Write tool, or a heredoc).
-codex exec --json --sandbox danger-full-access --skip-git-repo-check \
-  -c model_reasoning_effort=high -c service_tier=priority \
+# Launch through the guard (Step 5). Two constraints the guard imposes:
+#   * it closes stdin, so the prompt CANNOT arrive via `- < "$PROMPT_FILE"` — pass it as one
+#     argv word via "$(cat …)"; command substitution into a single quoted word is not re-evaluated,
+#     so backticks/quotes inside the prompt are safe.
+#   * it derives its own paths from TASK_ID, so use -o /tmp/codex_result_${TASK_ID}.txt and let
+#     the guard own the events file (no `| tee`).
+bash ~/.claude/skills/codex/scripts/codex-guard.sh "$TASK_ID" 1800 -- \
+  codex exec --json --sandbox danger-full-access --skip-git-repo-check \
+  -c service_tier=priority \
   -c mcp_servers.playwright.enabled=true \
   -c mcp_servers.chrome-devtools.tools.new_page.approval_mode=auto \
   -c mcp_servers.chrome-devtools.tools.take_snapshot.approval_mode=auto \
   --cd <project_directory> \
-  -o /tmp/codex_test_result_${TASK_ID}.txt \
-  - < "$PROMPT_FILE" 2>&1 | tee /tmp/codex_test_events_${TASK_ID}.jsonl
+  -o "/tmp/codex_result_${TASK_ID}.txt" "$(cat "$PROMPT_FILE")"
 ```
 
-> **Why the prompt goes through a file, not an argv string:** Step 1 injects concrete credentials into the prompt. Passing that as a CLI argument would expose secrets in `ps`/process listings and tool telemetry. Write the fully-constructed prompt (Step 1 context + Step 2 directive block) to `PROMPT_FILE` with `umask 077` first, then feed it via `codex exec … - < "$PROMPT_FILE"` (the `-` tells codex to read instructions from stdin; stdin EOFs when the file ends, so this preserves the stdin-hang prevention — no separate `</dev/null` needed). Never `echo`/`cat` the prompt to a terminal or log.
+> **Why the prompt is built in a 0600 file:** Step 1 injects concrete credentials into the prompt. Write the full prompt (Step 1 context + Step 2 directive block) to `PROMPT_FILE` under `umask 077` so it never sits in shell history or a world-readable path, then pass it as one argv word via `"$(cat "$PROMPT_FILE")"`. Command substitution into a single quoted word is not re-evaluated, so quotes and backticks inside the prompt are safe. The argv word IS visible in `ps` for the run's lifetime; accept that, because the guard closes stdin and the stdin (`-`) form cannot work here. Never `echo`/`cat` the prompt to a terminal or log.
 
 **Flag rationale (do not deviate):**
 
@@ -125,47 +132,54 @@ codex exec --json --sandbox danger-full-access --skip-git-repo-check \
 |------|-----|
 | `--sandbox danger-full-access` | Codex needs to fix code, run the server/test, **and launch a browser**. `read-only` blocks writes; `workspace-write` (the macOS Seatbelt) **blocks Chromium's multiprocess Mach registration** → a codex-launched browser dies with a Mach-bootstrap error before the first page (verified). `danger-full-access` disables the OS sandbox so Chromium runs normally. Safety comes from the prompt guardrails (no prod / no `rm` / no commit), not the sandbox. Valid `--sandbox` values: `read-only`, `workspace-write`, `danger-full-access`. |
 | `-c mcp_servers.playwright.enabled=true` | **Enables the DEFAULT driver.** The Playwright MCP is registered-but-disabled in `~/.codex/config.toml`; this turns it on for the run (bare `true` parses as a TOML boolean — verified it enables Playwright). This is the isolated-browser path Codex should use whenever it has/needs no creds. Keep this on for nearly every run. |
-| `-c mcp_servers.chrome-devtools.tools.new_page.approval_mode=auto` / `…take_snapshot.approval_mode=auto` | Only matters on the **chrome-devtools exception path** (already-logged-in session). `~/.codex/config.toml` sets these two chrome-devtools tools to `approval_mode="approve"`, which would stall an unattended drive on Codex's *own* tool-approval prompt. In codex-cli 0.142.3 the **valid per-tool values are `auto`, `prompt`, `approve`** — set `auto` for unattended runs. ⚠️ `never` is **not** a valid per-tool `approval_mode` and makes config loading **fail** (verified on 0.142.3). The hyphen in `chrome-devtools` needs no quoting in the dotted `-c` path. Harmless to leave in on Playwright-only runs. |
-| `- < "$PROMPT_FILE"` (stdin) | Feeds the prompt from a `0600` temp file instead of an argv string, so **injected credentials never appear in `ps`/argv/telemetry**. `-` tells codex to read instructions from stdin; the file EOFs immediately, so it also **prevents the "Reading additional input from stdin…" hang** (the #1 codex wedge) — no separate `</dev/null` needed. Never pass the credential-bearing prompt as a quoted CLI argument. |
+| `-c mcp_servers.chrome-devtools.tools.new_page.approval_mode=auto` / `…take_snapshot.approval_mode=auto` | Only matters on the **chrome-devtools exception path** (already-logged-in session). `~/.codex/config.toml` sets these two chrome-devtools tools to `approval_mode="approve"`, which would stall an unattended drive on Codex's *own* tool-approval prompt. The valid per-tool values are `auto`, `prompt`, `approve` — set `auto` for unattended runs. ⚠️ `never` is **not** a valid per-tool `approval_mode`; it makes config loading fail. If a run dies on config load, re-check the accepted values against the installed CLI's own help rather than assuming this list. The hyphen in `chrome-devtools` needs no quoting in the dotted `-c` path. Harmless to leave in on Playwright-only runs. |
+| `"$(cat "$PROMPT_FILE")"` (prompt argv word) | Builds the prompt from a `0600` temp file at call time. The guard closes stdin, so the stdin (`-`) form is unavailable; closing stdin is also what prevents the "Reading additional input from stdin…" wedge. |
 | (no `--full-auto`) | Deprecated; hangs with `--json`. Not needed — `approval_policy="never"` already gives unattended behavior. |
 | `--json` + background + `tee` | Stream JSONL events for Monitor and capture for the post-mortem. |
-| `-c model_reasoning_effort=high` / `-c service_tier=priority` | Lower latency, no quality loss; never drop reasoning below `high` to "go faster". |
+| `-c service_tier=priority` | Fast mode — lower latency, no quality loss. ⛔ Never pass `-c model_reasoning_effort`: it would OVERRIDE the `max` in `~/.codex/config.toml` with something lower. Effort comes from the config file, same rule as the `codex` skill. |
 | `--skip-git-repo-check` / `--cd` / `-o` | Run from any dir / target dir / capture the final verdict message. |
 
 Use a **generous Bash timeout — up to `600000` ms**; e2e runs are long.
 
 ---
 
-## Step 4 — Stream progress with Monitor
+## Step 4 — Stream progress with Monitor (OPTIONAL — only if the user asks for live progress)
 
-Reuse the shared, task-agnostic filter the `/codex` skill defines at `/tmp/codex_progress_filter.py` (reference it; only recreate it from the `/codex` skill if the file is missing). Launch the `Monitor` tool on:
+Tail the guard's events file `/tmp/codex_events_${TASK_ID}.jsonl` through the shared, task-agnostic filter the `/codex` skill defines at `/tmp/codex_progress_filter.py` (reference it; only recreate it from the `/codex` skill if the file is missing). Launch the `Monitor` tool on:
 
 ```bash
-tail -n +1 -f /tmp/codex_test_events_${TASK_ID}.jsonl | python3 -u /tmp/codex_progress_filter.py
+tail -n +1 -f /tmp/codex_events_${TASK_ID}.jsonl | python3 -u /tmp/codex_progress_filter.py
 ```
 
-Surface one-line updates (session started / running `<cmd>` / browser step / screenshot / fix applied / finished exit N) — **don't dump raw JSON**. Push-based; don't sleep-poll. When the completion notification fires, `TaskStop` the Monitor (`tail -f` never exits on its own) and the background Bash task.
+Surface one-line updates (session started / running `<cmd>` / browser step / screenshot / fix applied / finished exit N) — **don't dump raw JSON**. Push-based; don't sleep-poll. **Skip this step by default** — the Step 5 guard already reports the outcome, and attaching Monitor for an unattended run is pure noise. When the completion notification fires, `TaskStop` the Monitor (`tail -f` never exits on its own) and the background Bash task.
 
 ---
 
-## Step 5 — Hang detection & auto-recovery (do it yourself, don't wait)
+## Step 5 — Hang detection & recovery: `codex-guard.sh` owns it, you don't
 
-Same failure mode and recovery as `/codex` — apply that skill's "Hang detection & auto-recovery" section. In brief:
+Supervising the run — startup-hang detection, scoped kill, one retry, terminal status — is pure rules,
+so it belongs to a **script**, never to you or a sub-agent (global "No LLM watchdog/monitor", every tier).
 
-- **Detect:** zero JSONL events after ~2 min, OR the codex process is `S` (sleeping) with `cputime` stuck near `0:00` while `etime` climbs, OR Monitor emits nothing for >2 min.
-- **Recover:** kill *this run's* tree first, not every codex on the box — concurrent `/codex` / `/codexloop` / other `/codex-test` runs may be live. Prefer the background Bash task's PID (`TaskStop` it), or target by the unique TASK_ID — the result path is in codex's argv, so `pkill -9 -f "codex_test_result_${TASK_ID}" 2>/dev/null` kills this run's codex process, and `pkill -9 -f "codex_test_events_${TASK_ID}" 2>/dev/null` clears its `tee`. Only fall back to the blunt `pkill -9 -f "codex exec"` if no task-specific PID can be identified. Then `TaskStop` the Monitor. **Retry ONCE** (a stuck stdin is the usual cause — the `- < "$PROMPT_FILE"` feed should already prevent it; re-confirm the file exists and EOFs).
-- **If it hangs a second time:** stop fighting Codex. Tell the user Codex was unavailable and either (a) run the test yourself via `webapp-testing` / `playwright`, or (b) suggest they run it interactively with `! codex …` (interactive Codex avoids the headless stdin hang).
+**This is not a second run.** Step 3 already shows the single guard-wrapped invocation — launch that one
+command with `run_in_background: true`. Do not issue a bare `codex exec` anywhere in this skill.
 
-**Browser-path wedges (seen in practice):**
-- **chrome-devtools connect wedge:** the very first chrome-devtools call (`list_pages` / first navigate) can hang for the full ~300s tool timeout when `--autoConnect` can't cleanly attach to Chrome — Monitor goes silent after an `mcp_tool_call` *started* with no *completed*, and codex sits `S` with flat cputime. This is the #1 reason to **prefer Playwright**. If you're on chrome-devtools and see this, abort and **re-run on the Playwright isolated-browser path** (which doesn't depend on the user's Chrome). Note: a single `codex exec` run only spawns the MCP servers it needs and tears them down on exit — long-lived `chrome-devtools-mcp` processes on the box usually belong to the user's Codex.app, **not** your run; don't kill those.
-- **Native dialog wedge:** if a real OS/browser "Allow" dialog appears and computer-use can't clear it (the expected unattended outcome — `Computer Use approval denied via MCP elicitation`), codex will stall. Don't wait it out: this means the chosen flow needs a native click that can't happen unattended — re-architect to the Playwright programmatic-permission path, or tell the user this specific flow needs a human/interactive `! codex …` run.
-- **Chromium won't launch (macOS sandbox):** errors mentioning *Mach bootstrap / service registration*, or a Playwright/Chromium launch that dies before the first page, mean Codex was run under the Seatbelt — confirm the invocation used **`--sandbox danger-full-access`**, not `workspace-write`. (A `--single-process` Chromium launch can limp along under the sandbox but makes some web APIs like `Notification.permission` flaky — fix the sandbox flag instead.)
+The harness re-invokes you when the guard exits, so there is nothing to poll. React only to the guard's
+`STATUS:` line in `/tmp/codex_status_${TASK_ID}.txt`:
 
----
+| STATUS | Your move |
+|--------|-----------|
+| `COMPLETED` / `RECOVERED` | Go to Step 6 and read `/tmp/codex_result_${TASK_ID}.txt` |
+| `TIMEOUT` | Alive but over the cap — re-run with a higher cap or a narrower scope |
+| `STALLED` | Collab-tool wedge — re-run once with the no-collab preamble present |
+| `FAILED` | Codex unavailable. Tell the user, and either run the test yourself via `webapp-testing`, or suggest they run codex interactively (`! codex …`) |
+
+Do **not** watch `ps`/`cputime`, do not sleep-poll, and do not `pkill` codex yourself — a blind kill
+takes out concurrent `/codex`, `/codexloop`, and other `/codex-test` runs. The guard's kill is
+`TASK_ID`-scoped for exactly that reason.
 
 ## Step 6 — Report the verdict
 
-Read `/tmp/codex_test_result_${TASK_ID}.txt` (Codex's final message) and present:
+Read `/tmp/codex_result_${TASK_ID}.txt` (Codex's final message) and present:
 
 ```markdown
 ## Test Verdict (via Codex): PASS / FAIL / PARTIAL
