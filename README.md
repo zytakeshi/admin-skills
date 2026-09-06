@@ -21,7 +21,6 @@ A collection of sysadmin and DevOps skills for Claude Code. Automate deployments
 - **`/finish-translation`** — Auto-detect your project's i18n framework (ARB, JSON/i18next, .strings, .xcstrings, gettext, YAML/Rails, Android XML, .resx) and propagate, audit, or scan for hardcoded strings.
 - **`/ask-grok`** — Consult Grok (xAI) for real-time web and X/Twitter knowledge using your existing X Premium / SuperGrok subscription (no API key). Routes "what's the latest on…", breaking news, newest tool versions, and "what are people saying on X about…" to Grok via the official Grok CLI, then shows the answer verbatim with its source links.
 - **`/cdp-chrome`** — Run Chrome DevTools (CDP) browser automation **unattended** on Chrome 136+ by attaching to a dedicated, already-logged-in Chrome instance via `--browserUrl` — so the native "Allow remote debugging?" consent dialog never appears and `chrome-devtools-mcp` / Puppeteer / Playwright stop hanging on connect. Bundles a `cdp-chrome` helper (start / reseed / status / config). macOS.
-- **`/fable5`** — Guide for spending a frontier-tier model session (e.g. Claude's Fable 5) well: decide if work is a "one-way door" worth the frontier tier, compress context first, have the frontier model write the one governing artifact — the durable decision, spec, or framework the most downstream work depends on (a data model or API contract, but equally a PRD, a rubric, a taxonomy, a research plan, or a policy) — then hand off implementation and verification to your cheap fleet (pairs well with `/codex` + `/codexloop` if you have them installed, but works with any implementation/review tooling).
 - **`/loop-builder`** — Guides you (or Claude) from "turn this into a recurring job" to a properly hardened unattended loop: pick the right worker (script vs. agent) and supervisor (cron / launchd / systemd timer / scheduled agent), write a loop spec with a security contract, implement dry-run-first with locking, idempotency, and observability, prepare rollback before enabling, soak behind pre-registered evidence gates, and arm mutating loops through an auditable transaction with human authority for high-risk automation. Quiet by default — pages only on actionable failures.
 
 ## Install
@@ -46,7 +45,6 @@ npx skills add zytakeshi/admin-skills@team
 npx skills add zytakeshi/admin-skills@finish-translation
 npx skills add zytakeshi/admin-skills@ask-grok
 npx skills add zytakeshi/admin-skills@cdp-chrome
-npx skills add zytakeshi/admin-skills@fable5
 npx skills add zytakeshi/admin-skills@loop-builder
 ```
 
@@ -67,7 +65,6 @@ npx skills add zytakeshi/admin-skills@loop-builder
 | [finish-translation](skills/finish-translation/) | Auto-detect your i18n framework and propagate / audit / scan for hardcoded strings across all locales |
 | [ask-grok](skills/ask-grok/) | Consult Grok (xAI) for real-time web + X/Twitter knowledge via the official Grok CLI (subscription OAuth, no API key) — latest releases, breaking news, social pulse, answers shown verbatim with source links |
 | [cdp-chrome](skills/cdp-chrome/) | Run Chrome DevTools (CDP) automation unattended on Chrome 136+ — attach to a dedicated, logged-in Chrome via `--browserUrl` so the "Allow remote debugging?" dialog never appears; bundles a `cdp-chrome` helper (start / reseed / status / config). macOS |
-| [fable5](skills/fable5/) | Guide for spending a frontier-tier model session well — one-way-door test, context-pack compression, spawn-as-sub-agent-then-return pattern, handoff to your cheap fleet (pairs with `/codex` + `/codexloop`, or any equivalent) |
 | [loop-builder](skills/loop-builder/) | Design, build, test, soak, and safely arm unattended automation loops (cron / launchd / systemd timers / scheduled agents / daemons) — worker/supervisor selection, security contract, dry-run-first, rollback prep, evidence-gated soak, auditable arm transaction |
 
 ## Usage
@@ -87,7 +84,6 @@ After installing, use the skills in Claude Code:
 - `/finish-translation` — sync / audit translations across all locales
 - `/ask-grok` — get live web / X answers from Grok, shown verbatim with sources
 - `/cdp-chrome` — set up unattended Chrome DevTools automation (dedicated logged-in Chrome, no permission dialog)
-- `/fable5` — decide whether work is worth a frontier-tier model session, spend it well, and hand off to your cheap fleet
 - `/loop-builder` — design, harden, and safely arm a recurring automation loop
 
 ## See Also

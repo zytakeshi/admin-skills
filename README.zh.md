@@ -21,7 +21,6 @@
 - **`/finish-translation`** — 自动检测项目的 i18n 框架（ARB、JSON/i18next、.strings、.xcstrings、gettext、YAML/Rails、Android XML、.resx），并执行翻译传播、审计或硬编码字符串扫描。
 - **`/ask-grok`** — 用你现有的 X Premium / SuperGrok 订阅（无需 API key）向 Grok（xAI）查询实时 Web 和 X/Twitter 信息。把「最新进展」「突发新闻」「工具最新版本」「X 上大家在聊什么」经官方 Grok CLI 路由给 Grok，并把回答连同来源链接原样展示。
 - **`/cdp-chrome`** — 在 Chrome 136+ 上让 Chrome DevTools（CDP）浏览器自动化**无人值守**运行：连接到一个专用的、已登录的 Chrome 实例（用 `--browserUrl`），从而再也不会弹出「Allow remote debugging?」原生授权框，`chrome-devtools-mcp` / Puppeteer / Playwright 也不再卡在连接处。附带 `cdp-chrome` 辅助脚本（start / reseed / status / config）。仅 macOS。
-- **`/fable5`** — 如何用好一次前沿级模型会话（例如 Claude 的 Fable 5）的指南：判断某项工作是否值得动用前沿级（是否是"单向门"——反悔成本很高的决定），先压缩上下文，再让前沿模型写出那一个治理性产物——下游工作最依赖的、耐久的决定/规格/框架（可以是数据模型或 API 契约，也同样可以是 PRD、评审 rubric、分类体系、研究计划或策略），然后把实现和验证交给你的廉价机队（有 `/codex` + `/codexloop` 就用它们，没有就用等效工具）。
 - **`/loop-builder`** — 引导你（或 Claude）把"把这个做成定时任务"落地为一个经过充分加固的无人值守循环：挑选合适的执行体（脚本 vs. agent）和调度器（cron / launchd / systemd timer / 定时 agent），写出带安全契约的循环规格（loop spec），先实现 dry-run，配合加锁、幂等性和可观测性，在启用前准备好回滚方案，按预先注册的证据门（evidence gate）进行验证式试运行（soak），并通过可审计的 arm 事务、由人工对高风险自动化授权后再正式启用会产生变更的循环。默认静默——只有需要人工立即处理的故障才会推送告警。
 
 ## 安装
@@ -46,7 +45,6 @@ npx skills add zytakeshi/admin-skills@team
 npx skills add zytakeshi/admin-skills@finish-translation
 npx skills add zytakeshi/admin-skills@ask-grok
 npx skills add zytakeshi/admin-skills@cdp-chrome
-npx skills add zytakeshi/admin-skills@fable5
 npx skills add zytakeshi/admin-skills@loop-builder
 ```
 
@@ -67,7 +65,6 @@ npx skills add zytakeshi/admin-skills@loop-builder
 | [finish-translation](skills/finish-translation/) | 自动检测 i18n 框架，传播 / 审计 / 扫描全部 locale 的翻译与硬编码字符串 |
 | [ask-grok](skills/ask-grok/) | 用官方 Grok CLI（订阅 OAuth，无需 API key）向 Grok（xAI）查询实时 Web 和 X/Twitter 信息 — 最新发布、突发新闻、社区风向，回答连同来源链接原样展示 |
 | [cdp-chrome](skills/cdp-chrome/) | 在 Chrome 136+ 上让 Chrome DevTools（CDP）自动化无人值守运行 — 用 `--browserUrl` 连接专用的已登录 Chrome，从此不再弹「Allow remote debugging?」授权框；附 `cdp-chrome` 脚本（start / reseed / status / config）。仅 macOS |
-| [fable5](skills/fable5/) | 如何用好一次前沿级模型会话 — 单向门判断、上下文压缩打包、以子代理身份调用后交还控制权、交接给廉价机队（如 `/codex` + `/codexloop`） |
 | [loop-builder](skills/loop-builder/) | 设计、构建、测试、观察运行并安全启用无人值守自动化循环（cron / launchd / systemd timer / 定时 agent / 守护进程）— 执行体/调度器选型、安全契约、dry-run 优先、回滚准备、证据门观察运行、可审计的 arm 事务 |
 
 ## 使用方法
@@ -87,7 +84,6 @@ npx skills add zytakeshi/admin-skills@loop-builder
 - `/finish-translation` — 同步 / 审计所有 locale 的翻译
 - `/ask-grok` — 从 Grok 获取实时 Web / X 信息，连同来源原样展示
 - `/cdp-chrome` — 配置无人值守的 Chrome DevTools 自动化（专用已登录 Chrome，无授权弹窗）
-- `/fable5` — 判断某项工作是否值得一次前沿级模型会话，用好它，并交接给你的廉价机队
 - `/loop-builder` — 设计、加固并安全启用一个定时自动化循环
 
 ## 相关项目
