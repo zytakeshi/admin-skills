@@ -95,8 +95,6 @@ EOF
 
 ## Phase 3: Monitor for Codex Review
 
-> **Note (March 31, 2026):** Codex Code Review now counts toward regular Codex usage limits instead of having a separate allowance. Heavy usage may cause users to hit their overall Codex limit sooner.
-
 This is the critical automation step. After creating the PR, poll GitHub API for review activity from the Codex bot (`chatgpt-codex-connector[bot]`).
 
 ### How Codex reviews appear on GitHub
@@ -298,7 +296,7 @@ When comments arrive:
        --method POST -f body="<your reasoning for disagreeing>"
      ```
      This lets Codex see your counterargument in the next review round and either accept it or push back.
-   - **Partially agree** (the concern is valid but the suggested fix isn't ideal): Reply to the comment explaining why you're taking a different approach, then implement your better alternative.
+   - **Partially agree** (the concern is valid but the suggested fix isn't ideal): Reply to the comment explaining why you're taking a different approach, then implement your better alternative. If the alternative widens scope, changes architecture/public API, or adds an abstraction, stop and ask; do not implement it silently.
 3. After processing all comments (fixes + reply-comments):
    - If any code was changed: run the project's lint/analyze command to verify no regressions, stage only the changed files, create a NEW commit (never amend):
      ```
@@ -371,3 +369,7 @@ After Codex gives a clean review (or user elects to merge):
 /create-pr bump minor
 /create-pr no version bump
 ```
+
+## VilaVPN tracking (vilaops)
+For VilaVPN-family repos, the PR body MUST carry the Tracking contract: `Tracking-Issue: owner/repo#N` + `Tracking-Mode: gated|gate-none`, or `Tracking-Exempt: single-session single-repo no-verify-tail`. Gated issues: `Refs owner/repo#N` only — never Fixes/Closes/Resolves in title, body, or commits. See global CLAUDE.md §VilaVPN Ops Center.
+After the merge lands, fire a targeted board poll: `gh workflow run poll.yml --repo zytakeshi/vilavpn-ops -f force=true -f spoke=<repo-name>`.

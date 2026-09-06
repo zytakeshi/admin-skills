@@ -24,8 +24,6 @@ A collection of sysadmin and DevOps skills for Claude Code. Automate deployments
 - **`/fable5`** — Guide for spending a frontier-tier model session (e.g. Claude's Fable 5) well: decide if work is a "one-way door" worth the frontier tier, compress context first, have the frontier model write the one governing artifact — the durable decision, spec, or framework the most downstream work depends on (a data model or API contract, but equally a PRD, a rubric, a taxonomy, a research plan, or a policy) — then hand off implementation and verification to your cheap fleet (pairs well with `/codex` + `/codexloop` if you have them installed, but works with any implementation/review tooling).
 - **`/loop-builder`** — Guides you (or Claude) from "turn this into a recurring job" to a properly hardened unattended loop: pick the right worker (script vs. agent) and supervisor (cron / launchd / systemd timer / scheduled agent), write a loop spec with a security contract, implement dry-run-first with locking, idempotency, and observability, prepare rollback before enabling, soak behind pre-registered evidence gates, and arm mutating loops through an auditable transaction with human authority for high-risk automation. Quiet by default — pages only on actionable failures.
 
-> **Note (March 31, 2026):** Codex Code Review now counts toward your regular Codex usage limit instead of having a separate allowance. Heavy Code Review usage may cause you to reach your overall Codex limit sooner. See [OpenAI's announcement](https://chatgpt.com/codex) for details.
-
 ## Install
 
 ```bash
