@@ -102,6 +102,9 @@ The key divergence from `/codex`: **never `--sandbox read-only`** (Codex must fi
 
 Derive a per-invocation `TASK_ID = test_<slug>_$(date +%Y%m%d_%H%M%S)` and use it for ALL output paths — never hardcode `/tmp/codex_test_result.txt` (collisions across concurrent runs, and with `/codex`'s own files). Run **in the background** (`run_in_background: true`):
 
+Run this command from the directory containing this `SKILL.md`; the guard is
+bundled with the sibling `codex` skill:
+
 ```bash
 TASK_ID=test_<slug>_$(date +%Y%m%d_%H%M%S)
 PROMPT_FILE=/tmp/codex_test_prompt_${TASK_ID}.md
@@ -114,7 +117,7 @@ umask 077          # PROMPT_FILE holds injected credentials → 0600
 #     so backticks/quotes inside the prompt are safe.
 #   * it derives its own paths from TASK_ID, so use -o /tmp/codex_result_${TASK_ID}.txt and let
 #     the guard own the events file (no `| tee`).
-bash ~/.claude/skills/codex/scripts/codex-guard.sh "$TASK_ID" 1800 -- \
+bash ../codex/scripts/codex-guard.sh "$TASK_ID" 1800 -- \
   codex exec --json --sandbox danger-full-access --skip-git-repo-check \
   -c service_tier=priority \
   -c mcp_servers.playwright.enabled=true \
