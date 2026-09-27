@@ -108,7 +108,7 @@ Adjust dynamically based on the actual `--target` and what files exist. The goal
 
 ### 2.2 Cost / Scope Gate (STOP — get go/no-go before spawning)
 
-**Before spawning anything, state the plan and wait for explicit approval.** Fleet review fans out many concurrent agents on Opus — this is expensive and must never launch unprompted. (Real incident: 32 verifiers + 10 lanes launched on Opus with no confirmation — "wow pause that".)
+**Before spawning anything, state the plan and wait for explicit approval.** Fleet review fans out many concurrent agents on Opus, so an unprompted launch spends heavily before anyone has agreed to the scope.
 
 Post a one-block estimate, then **STOP and ask the user for a go/no-go**:
 
@@ -125,7 +125,7 @@ Rough sizing: tokens ≈ agents × (scope files × ~2k read + prompt/overhead); 
 
 ### 2.3 Spawn All Agents in One Turn
 
-**Spawn all agents simultaneously in a single message.** Use the `Agent` tool (or your harness's equivalent) with a code-reading agent type for each. These are read-only sub-agents — inline is correct here.
+**Spawn all agents simultaneously in a single message.** Use the `Agent` tool (or your harness's equivalent) with a code-reading agent type for each, and set `model` explicitly on every spawn to the model the go/no-go gate approved. These are read-only sub-agents — inline is correct here.
 
 Each agent gets a prompt like:
 
