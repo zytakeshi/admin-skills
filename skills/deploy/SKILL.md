@@ -97,12 +97,13 @@ If any files diverge, do NOT proceed without user confirmation. Hot-patches may 
 This step is mandatory — never skip it, even if the user doesn't mention backups.
 
 ```bash
-# Create dated backup directory on server
-ssh <SSH_OPTS> <USER>@<HOST> "mkdir -p <REMOTE_PATH>/backups/$(date +%Y-%m-%d)"
+# One timestamp for the whole deploy, so a second deploy the same day never overwrites this backup
+TS=$(date +%Y%m%d-%H%M%S)
+ssh <SSH_OPTS> <USER>@<HOST> "mkdir -p <REMOTE_PATH>/backups/$TS"
 
 # Back up each file being replaced
 ssh <SSH_OPTS> <USER>@<HOST> \
-  "cp <REMOTE_PATH>/<file> <REMOTE_PATH>/backups/$(date +%Y-%m-%d)/<file>.bak"
+  "cp <REMOTE_PATH>/<file> <REMOTE_PATH>/backups/$TS/<file>.bak"
 ```
 
 - If a file doesn't exist on the server (new file), note it and skip its backup
@@ -190,7 +191,7 @@ ssh <SSH_OPTS> <USER>@<HOST> "
 | **Web server config** | nginx/apache/httpd config files deployed | Reload the corresponding service |
 
 ### When no cache action is needed
-- Only data files (`.json`, `.csv`, `.yaml`, `.env`) were deployed that the app reads fresh each request
+- Only data files (`.json`, `.csv`, `.yaml`) were deployed that the app reads fresh each request
 - No bytecode/object/page caching is running
 - The app is a simple file-serving setup with no caching layer
 

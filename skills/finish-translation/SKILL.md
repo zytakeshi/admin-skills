@@ -1,6 +1,6 @@
 ---
 name: finish-translation
-description: "Propagate new/changed translations to all target languages, audit for missing keys, and find hardcoded strings. Auto-detects the i18n framework (ARB/Flutter, JSON/i18next, .strings/Apple, .xcstrings, gettext .po, YAML/Rails, Android XML). Use this skill when the user says /finish-translation, 'internationalization', 'i18n', 'l10n', 'finish translation', 'translate strings', 'translate new strings', 'sync translations', 'fill missing translations', 'missing translations', 'translation audit', 'find hardcoded strings', or any variation requesting translation propagation, i18n auditing, or localization work."
+description: "Propagate new or changed translation strings to every target language, audit missing keys, and find hardcoded user-facing strings. Auto-detects the i18n framework (ARB/Flutter, JSON/i18next, .strings/Apple, .xcstrings, gettext .po, YAML/Rails, Android XML). Use for /finish-translation and any i18n or l10n request: translating or syncing strings, filling missing translations, translation audits, or hardcoded-string scans."
 ---
 
 # Finish Translation

@@ -16,7 +16,7 @@ Skill list: see `skills/*/SKILL.md` frontmatter (this table went stale; frontmat
 
 ## Skill Authoring Conventions
 
-- **Frontmatter**: `name` (kebab-case), `description` (include all trigger phrases — this is how Claude matches user intent to skill)
+- **Frontmatter**: `name` (kebab-case), `description` (what the skill does + the intent categories that should route to it; add a literal trigger phrase only when a real miss shows the categories did not catch it — descriptions ride in every session's skill listing)
 - **Safety-first**: Every skill that touches production must include backup/rollback steps. Never use `rm -rf`. Never stage `.env` or credential files.
 - **Parallel where possible**: Group independent shell commands to run in parallel (e.g., `git status` + `git diff` + `git log`)
 - **Explicit staging**: Always `git add <specific-files>`, never `git add -A` or `git add .`
@@ -34,9 +34,9 @@ Skill list: see `skills/*/SKILL.md` frontmatter (this table went stale; frontmat
 
 ## Downstream Repos
 
-`skills/create-pr/SKILL.md` in **this repo** is the single source of truth. The standalone public repo `create-pr-codex-review` (`zytakeshi/create-pr-codex-review`) ships a **real-file copy** of it — not a symlink. (It used to be a committed symlink pointing at a local `admin-skills` path; that could not resolve for external `npx skills add` installs and silently masked content drift, so it was dereferenced.)
+`skills/create-pr/SKILL.md` in **this repo** is the single source of truth. The standalone public repo `create-pr-codex-review` (`zytakeshi/create-pr-codex-review`) ships a **real-file copy** of it — not a symlink, because a symlink to a local `admin-skills` path cannot resolve for external `npx skills add` installs and hides content drift.
 
-Because there is no longer a symlink, edits here do **not** auto-propagate. After updating `skills/create-pr/SKILL.md`, commit + push here, then manually sync the downstream repo:
+Edits here do **not** auto-propagate. After updating `skills/create-pr/SKILL.md`, commit + push here, then manually sync the downstream repo:
 
 ```bash
 SRC=/path/to/admin-skills/skills/create-pr/SKILL.md

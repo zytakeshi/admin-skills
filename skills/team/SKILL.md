@@ -26,7 +26,7 @@ The required workflow is:
 5. **`TaskStop` on each recorded agent the moment it reaches ANY terminal state** (finished, crashed, rejected, stalled, or reclaimed) — this is the dismissal. Per agent, not only at the end.
 6. `ListAgents` as the final gate — confirm none of your teammates are still listed. Any survivor gets `TaskStop` again before you report to the user.
 
-⛔ Do NOT originate `SendMessage {"type": "shutdown_request"}` — the tool documents it as a legacy protocol and says not to originate it. ⛔ Do NOT call `TeamDelete`; it does not exist.
+⛔ Do NOT originate `SendMessage {"type": "shutdown_request"}` — the tool documents it as a legacy protocol and says not to originate it.
 
 ## Process
 
@@ -70,6 +70,7 @@ Then immediately proceed to execution — do NOT wait for confirmation unless th
 
 **Step 3b: Spawn ALL teammates simultaneously** in a single message using the `Agent` tool. Every Agent call MUST include:
 - `name` — the teammate's kebab-case name, made **run-unique** (e.g. append a short run suffix). It is both the message address and the `TaskStop` handle.
+- `model` — set it explicitly on every spawn: `opus` for judgment/implementation, `sonnet` for mechanical lanes. Never inherit.
 - ⛔ Do NOT pass `team_name` — the parameter is documented as "Deprecated; ignored".
 
 **Step 3c: Record every spawned agent's returned ID immediately**, as each call returns — not in a batch afterwards. If one spawn in the parallel batch fails, the ones that already succeeded are live and must still be recorded, or they can never be dismissed. This record is the cleanup list.
