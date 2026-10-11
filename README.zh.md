@@ -8,10 +8,10 @@
 
 ## 为什么用这些技能？
 
-- **`/deploy`** — 零停机部署，强制备份、差异检测、自动清理缓存。再也不会忘记回滚方案。
+- **`/deploy`** — 通过 SSH/SCP 部署，包含强制备份、差异检测、按技术栈处理缓存和冒烟测试。停机时间取决于应用和部署方式。
 - **`/commit-push`** — 分析 diff，生成规范的 commit message，安全推送。告别 "fix stuff" 提交。
 - **`/create-pr`** — 创建 PR 后自动由 [OpenAI Codex](https://chatgpt.com/codex) 审查。审查完成后，Claude 自动读取反馈、修复认可的问题、推送修复，然后询问你是否合并 — 全流程端到端自动化。
-- **`/html`** — 生成**单文件、自包含、带动画**的 HTML 讲解页（暗色滚动叙事、CJK 字体兼容、零依赖），用于讲解概念、系统、数据或产品。
+- **`/html`** — 生成**单文件、带动画**的 HTML 讲解页，自动适配明暗主题，内含英语、简体中文和日语内容。默认无外部依赖；使用可选 CDN 库时必须固定版本并提供回退方案。
 - **`/codex`** — 桥接 OpenAI Codex CLI，用于代码审查、设计咨询、Bug 调查、安全审计与第二意见。流式推送事件，最终回答按调用 ID 存储到独立结果文件，超越 diff 本身发现跨层集成问题。
 - **`/codexloop`** — 用 Codex 做迭代审查＋修复循环：Codex 审查 → Claude 修复认可的问题 → 再审查 → 直到代码干净或双方达成"诚实的分歧"。无固定迭代上限。
 - **`/codex-test`** — 把无头/无人值守的浏览器冒烟或 e2e 测试卸载给 Codex CLI。它驱动隔离的 Playwright 浏览器（仅在需要时接入已登录的 Chrome 会话），可修改代码并重跑直到流程通过，流式推送进度，并报告 PASS/FAIL 结论及所做改动。
@@ -55,7 +55,7 @@ npx skills add zytakeshi/admin-skills@loop-builder
 | [deploy](skills/deploy/) | 通过 SSH/SCP 部署到远程服务器，自带备份、差异检测、缓存清理和冒烟测试 |
 | [commit-push](skills/commit-push/) | 分析改动，生成 commit message，一键暂存、提交、推送 |
 | [create-pr](skills/create-pr/) | PR 全生命周期自动化：提交、推送、创建 PR、等待 Codex 审查、修复问题、合并 |
-| [html](skills/html/) | 生成单文件动画 HTML 讲解页 — 滚动叙事、CJK 兼容、零依赖 |
+| [html](skills/html/) | 生成单文件动画 HTML 讲解页 — 自动适配明暗主题、英语/简中/日语内容、默认无外部依赖 |
 | [codex](skills/codex/) | 桥接 OpenAI Codex CLI，做代码审查、设计咨询、安全审计与第二意见，带进度流式推送 |
 | [codexloop](skills/codexloop/) | 用 Codex 做迭代审查＋修复循环，直到代码干净或双方达成诚实分歧 |
 | [codex-test](skills/codex-test/) | 把无头/无人值守的浏览器冒烟或 e2e 测试卸载给 Codex CLI — Playwright 优先（隔离浏览器），可改代码并重跑，报告 PASS/FAIL |
