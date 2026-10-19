@@ -1,9 +1,9 @@
 ---
 name: codexloop
-description: "Run /codex in a loop: review the code, fix findings you agree with, re-review, and keep going until codex has nothing left to flag (or only disagreements remain). Use when the user types /codexloop or asks for an iterative codex review-and-fix cycle until clean. Triggers: '/codexloop', 'codex loop', 'iterative codex review', 'loop codex until clean', 'review and fix with codex until satisfied'."
+description: "Run /codex in a loop: review the code, fix findings you agree with, re-review, and keep going while P1 findings remain (correctness, security, money, data loss, swallowed errors); nits never extend the loop. Use when the user types /codexloop or asks for an iterative codex review-and-fix cycle until clean. Triggers: '/codexloop', 'codex loop', 'iterative codex review', 'loop codex until clean', 'review and fix with codex until satisfied'."
 ---
 
-You are running an iterative review-and-fix loop with Codex. Codex is the reviewer; you are the implementer. Keep looping until the code is clean or you and codex have reached an honest impasse on the remaining findings.
+You are running an iterative review-and-fix loop with Codex. Codex is the reviewer; you are the implementer. Loop until no P1 finding remains, or until the round budget is spent (see The stopping rule below).
 
 ## User Request
 
@@ -15,9 +15,26 @@ A single `/codex` pass finds issues but doesn't fix them. A single fix pass addr
 
 The loop is not "keep going until codex has zero complaints no matter how petty." It's "keep going until both of you are honestly satisfied." Those are different things — codex can always find something to nitpick, and endless iteration on style or micro-optimizations burns time and tokens without improving the code. Your job is to recognize when further iteration stops adding value.
 
+## The stopping rule
+
+> **After the first review, only a P1 finding buys another round. Stop at 3 rounds, or 6 if the change touches prod, money, or auth.**
+
+**P1** = correctness, security, money, data loss, or a swallowed error. Everything else — style, naming, micro-optimization, speculative refactors, missing-but-optional tests — is a **nit**.
+
+Nits do not extend the loop. Collect them, apply the ones you agree with in a single batch at the end, and **never re-review that batch**. A nit batch does not earn another 500k-token round.
+
+Why the floor exists: measured over 114 real loops, the codex report shrinks to ~2,800 characters by round 3 and then plateaus there permanently, while input tokens grow 3.4x by round 11. Codex always finds something to say. The severity floor is the exit; the round count is only a backstop. A change still producing P1 findings at round 6 has a design problem, not a review problem — stop and escalate to the user.
+
+The round budget is set **before** round 1, from the change's blast radius:
+
+| Blast radius | Budget |
+|---|---|
+| Touches prod, money, billing, certs, DNS, fleet state, or auth | 6 rounds |
+| Everything else | 3 rounds |
+
 ## Core loop
 
-Iterate **without a fixed cap**. The loop exits only on the conditions in Phase D below (clean review, stable impasse, no progress, or diminishing returns). Each iteration has four phases.
+Each iteration has four phases.
 
 ### Phase A — Review
 
@@ -85,13 +102,15 @@ If something fast and already-configured can validate your fixes (type check, li
 
 Exit the loop when **any** of these is true:
 
+0. **The severity floor is hit** — the latest review produced no P1 finding. Batch the remaining nits, apply the ones you agree with, and exit. Do not re-review the batch. This is the normal exit.
+
 1. Codex's latest review is clean — no findings, or only "looks good" commentary.
    **Mission-critical carve-out** (the Phase B critical-path scope: payments/billing, auth, certs, security headers, prod deploys): a clean review alone does not exit. Also require one independent check that exercises the changed invariant/boundary — prefer the relevant tests or a behavioral verification (the smallest meaningful integration check is enough); a fresh reviewer pass with no loop history is a fallback only when nothing executable exists, and is weaker evidence. If the check fails, fix and keep looping. If nothing independent is runnable, exit anyway but name the residual risk explicitly in the report — never present a clean review as verified.
-2. Every remaining finding is one you already disagreed with on a prior iteration, and codex is repeating itself — you've reached a stable impasse. (The same finding returning with a new rationale still counts as repetition after one honest re-triage — don't re-litigate forever.)
+2. Every remaining finding is one you already disagreed with on a prior iteration, and codex is repeating itself — you've reached a stable impasse. (The same finding returning with a new rationale still counts as repetition after one honest re-triage — don't re-litigate forever.) **Consult, then decide — do not ask the user.** Put the disputed findings and your reasons to one fresh reviewer that has no loop history (the `review-fallback-opus` agent at high, or Cursor for a simple change). It sides with you → exit, and record each dispute with its reason in the report. It sides with codex → fix and loop once more. Ask the user only when the dispute touches money, auth, prod state or a public release.
 3. You made no edits this round AND codex's findings are substantively the same as last round — you're stuck, not progressing.
-4. The remaining findings are all low-value (style, micro-optimization, speculative refactors) and further iteration isn't justified. Say so explicitly in the final report rather than silently deciding.
+4. **The round budget is spent** (3, or 6 for prod/money/auth changes). Stop and report what is still open. If P1 findings are still appearing at the budget ceiling, say so plainly and escalate — that pattern means the change needs a design review, not another round.
 
-There is **no fixed iteration cap.** As long as each round produces real fixes that aren't being re-flagged, keep going. Otherwise, go back to Phase A with the updated code.
+Otherwise, go back to Phase A with the updated code.
 
 ## Final report
 
@@ -111,7 +130,7 @@ When the loop exits, give the user a tight summary:
 
 **Verification**: none | <test/behavioral check that ran> | residual risk: <named, if nothing runnable>
 
-**Exit reason**: clean review | clean review + verified | stable impasse | no progress | diminishing returns
+**Exit reason**: no P1 remaining | clean review | clean review + verified | stable impasse | no progress | round budget spent (N of M)
 ```
 
 The user wants to know what changed, what's still open, and why the loop stopped — not a replay of every codex message.
@@ -126,9 +145,9 @@ The user wants to know what changed, what's still open, and why the loop stopped
 - **Don't commit or push** unless the user explicitly asked. The loop edits files in place and reports; commits are the user's call.
 - **Track disagreements across iterations.** Keep a running list of findings you've disagreed with, with reasons. This is what you feed back to codex in Phase A of later iterations, and what lets you detect the "stable impasse" exit condition.
 - **No numeric grades as ship evidence.** Never ask codex for a score, and never quote one ("94/100 PASS") as justification to ship or to exit clean — in the report, in memory, or to the user. Loop outputs are findings + exit conditions; ship evidence is tests or behavioral verification. If codex volunteers a score unprompted, ignore it. (Phase B's internal `confidence` field is fine — it gates auto-apply, it is not a ship grade.)
-- **Stop early when it makes sense.** A short clean loop is better than 5 iterations of diminishing returns. Calling it done at iteration 2 with a good reason beats grinding through to iteration 5.
+- **Stop early when it makes sense.** The budget is a ceiling, not a target. A round that finds only nits ends the loop, even if it is round 1.
 - **Hang recovery is `codex-guard.sh`'s job, not yours.** The codex skill's guard script (its Step 2.5) owns launch, the startup-gate hang detection, the `TASK_ID`-scoped kill, and the one retry — do **not** run `pkill`/`TaskStop` yourself. You only react to the reported `STATUS` line: `COMPLETED`/`RECOVERED` → triage the findings; `TIMEOUT` → codex was alive but over the cap — re-run with a higher cap or narrow scope; `STALLED` → mid-run collab sub-agent wedge — re-run once making sure the no-collab preamble (codex skill Step 3 point 3) is in the prompt, then treat as `FAILED` if it recurs; `FAILED` → treat codex as unavailable and do the fallback review yourself on Opus (next bullet). (Only in explicit inline mode do you apply the codex skill's recovery directly.)
-- **If codex is unavailable** (not installed, network down, persistent errors, or it hangs a second time after recovery), fall back to your own review pass (a fresh Opus reviewer over the same diff), say so explicitly in the report, and note the user can run codex interactively via `! codex …`.
+- **Each iteration's review follows the codex skill's review lane order** (Codex lane on the viraltechofficial@gmail.com account via `codex-viraltech.sh` → Codex lane on the default ChatGPT login (zyvista) directly when viraltech is nerfed or errors → Cursor lane → `review-fallback-opus` agent, its Step 2.5; the AirGate lane is retired (founder 2026-10-13: the AirGate relay causes account nerf)). A lane that failed in one iteration is tried again in the next — quota can return. Name the lane and model per iteration in the final report. Only when all four lanes fail does the loop stop and report codex/Cursor unavailable; the user can still run codex interactively via `! codex …`.
 
 ## Note on the GitHub Codex bot (PR review workflow)
 
