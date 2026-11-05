@@ -22,6 +22,7 @@ Claude Code 向けのシステム管理・DevOps スキル集です。デプロ�
 - **`/ask-grok`** — 既存の X Premium / SuperGrok サブスクリプション（APIキー不要）で Grok（xAI）にリアルタイムの Web・X/Twitter 情報を照会。「最新の〜は？」「速報」「ツールの最新バージョン」「Xで〜について何と言われている？」を公式 Grok CLI 経由で Grok にルーティングし、回答をソースリンク付きでそのまま表示。
 - **`/cdp-chrome`** — Chrome 136+ で Chrome DevTools（CDP）ブラウザ自動化を**無人で**実行。専用のログイン済み Chrome インスタンスに `--browserUrl` で接続するため、「Allow remote debugging?」のネイティブ許可ダイアログが一切出ず、`chrome-devtools-mcp` / Puppeteer / Playwright が接続時にハングしなくなる。`cdp-chrome` ヘルパー（start / reseed / status / config）を同梱。macOS。
 - **`/loop-builder`** — 「これを定期実行ジョブにしたい」から、きちんとハードニングされた無人ループへと導くガイド。スクリプトとエージェントどちらをワーカーにするか、cron / launchd / systemd タイマー / スケジュール済みエージェントのどれを監督者にするかを選び、セキュリティ契約付きのループ仕様を書き、ロック・冪等性・可観測性を備えたドライラン優先の実装を行い、有効化前にロールバックを用意し、事前登録したエビデンスゲートで検証しながらソーク運用（実データでの様子見運用）を行い、高リスクな自動化には人間の承認を伴う監査可能な arm トランザクションで変更系ループを稼働させる。デフォルトは静か——ページ通知は人間の即時対応が必要な障害のときだけ。
+- **`/chief`** — 大規模な複数セッション作業の首席補佐官として動きます。多数の Orca セッションを指揮し、作業を Codex と Cursor に振り分け、テストゲートを厳密に保ち、デバイス、ディスク、利用枠を管理します。
 
 ## インストール
 
@@ -46,6 +47,7 @@ npx skills add zytakeshi/admin-skills@finish-translation
 npx skills add zytakeshi/admin-skills@ask-grok
 npx skills add zytakeshi/admin-skills@cdp-chrome
 npx skills add zytakeshi/admin-skills@loop-builder
+npx skills add zytakeshi/admin-skills@chief
 ```
 
 ## 利用可能なスキル
@@ -66,6 +68,7 @@ npx skills add zytakeshi/admin-skills@loop-builder
 | [ask-grok](skills/ask-grok/) | 公式 Grok CLI（サブスク OAuth、APIキー不要）で Grok（xAI）にリアルタイム Web・X/Twitter 情報を照会 — 最新リリース、速報、Xの反応を、ソースリンク付きでそのまま表示 |
 | [cdp-chrome](skills/cdp-chrome/) | Chrome 136+ で Chrome DevTools（CDP）自動化を無人実行 — `--browserUrl` で専用のログイン済み Chrome に接続し、「Allow remote debugging?」ダイアログを根絶。`cdp-chrome` ヘルパー（start / reseed / status / config）同梱。macOS |
 | [loop-builder](skills/loop-builder/) | 無人自動化ループ（cron / launchd / systemd タイマー / スケジュール済みエージェント / デーモン）の設計・構築・テスト・ソーク・安全な稼働化 — ワーカー/スーパーバイザー選定、セキュリティ契約、ドライラン優先、ロールバック準備、エビデンスゲート付きソーク、監査可能な arm トランザクション |
+| [chief](skills/chief/) | 複数セッションの大規模作業を首席補佐官として運営:作業の振り分け、ゲートの厳守、デバイス・ディスク・利用枠の管理 |
 
 ## 使い方
 
