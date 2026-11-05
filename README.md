@@ -22,6 +22,7 @@ A collection of sysadmin and DevOps skills for Claude Code. Automate deployments
 - **`/ask-grok`** — Consult Grok (xAI) for real-time web and X/Twitter knowledge using your existing X Premium / SuperGrok subscription (no API key). Routes "what's the latest on…", breaking news, newest tool versions, and "what are people saying on X about…" to Grok via the official Grok CLI, then shows the answer verbatim with its source links.
 - **`/cdp-chrome`** — Run Chrome DevTools (CDP) browser automation **unattended** on Chrome 136+ by attaching to a dedicated, already-logged-in Chrome instance via `--browserUrl` — so the native "Allow remote debugging?" consent dialog never appears and `chrome-devtools-mcp` / Puppeteer / Playwright stop hanging on connect. Bundles a `cdp-chrome` helper (start / reseed / status / config). macOS.
 - **`/loop-builder`** — Guides you (or Claude) from "turn this into a recurring job" to a properly hardened unattended loop: pick the right worker (script vs. agent) and supervisor (cron / launchd / systemd timer / scheduled agent), write a loop spec with a security contract, implement dry-run-first with locking, idempotency, and observability, prepare rollback before enabling, soak behind pre-registered evidence gates, and arm mutating loops through an auditable transaction with human authority for high-risk automation. Quiet by default — pages only on actionable failures.
+- **`/chief`** — Act as your chief of staff on a large multi-session effort: it drives many Orca sessions, routes work to Codex and Cursor, keeps test gates honest, and manages devices, disks and limits, so that you stay out of the loop.
 
 ## Install
 
@@ -46,6 +47,7 @@ npx skills add zytakeshi/admin-skills@finish-translation
 npx skills add zytakeshi/admin-skills@ask-grok
 npx skills add zytakeshi/admin-skills@cdp-chrome
 npx skills add zytakeshi/admin-skills@loop-builder
+npx skills add zytakeshi/admin-skills@chief
 ```
 
 ## Available Skills
@@ -66,6 +68,7 @@ npx skills add zytakeshi/admin-skills@loop-builder
 | [ask-grok](skills/ask-grok/) | Consult Grok (xAI) for real-time web + X/Twitter knowledge via the official Grok CLI (subscription OAuth, no API key) — latest releases, breaking news, social pulse, answers shown verbatim with source links |
 | [cdp-chrome](skills/cdp-chrome/) | Run Chrome DevTools (CDP) automation unattended on Chrome 136+ — attach to a dedicated, logged-in Chrome via `--browserUrl` so the "Allow remote debugging?" dialog never appears; bundles a `cdp-chrome` helper (start / reseed / status / config). macOS |
 | [loop-builder](skills/loop-builder/) | Design, build, test, soak, and safely arm unattended automation loops (cron / launchd / systemd timers / scheduled agents / daemons) — worker/supervisor selection, security contract, dry-run-first, rollback prep, evidence-gated soak, auditable arm transaction |
+| [chief](skills/chief/) | Run a large multi-session effort as your chief of staff: route work, keep gates honest, manage devices, disks and limits |
 
 ## Usage
 

@@ -22,6 +22,7 @@
 - **`/ask-grok`** — 用你现有的 X Premium / SuperGrok 订阅（无需 API key）向 Grok（xAI）查询实时 Web 和 X/Twitter 信息。把「最新进展」「突发新闻」「工具最新版本」「X 上大家在聊什么」经官方 Grok CLI 路由给 Grok，并把回答连同来源链接原样展示。
 - **`/cdp-chrome`** — 在 Chrome 136+ 上让 Chrome DevTools（CDP）浏览器自动化**无人值守**运行：连接到一个专用的、已登录的 Chrome 实例（用 `--browserUrl`），从而再也不会弹出「Allow remote debugging?」原生授权框，`chrome-devtools-mcp` / Puppeteer / Playwright 也不再卡在连接处。附带 `cdp-chrome` 辅助脚本（start / reseed / status / config）。仅 macOS。
 - **`/loop-builder`** — 引导你（或 Claude）把"把这个做成定时任务"落地为一个经过充分加固的无人值守循环：挑选合适的执行体（脚本 vs. agent）和调度器（cron / launchd / systemd timer / 定时 agent），写出带安全契约的循环规格（loop spec），先实现 dry-run，配合加锁、幂等性和可观测性，在启用前准备好回滚方案，按预先注册的证据门（evidence gate）进行验证式试运行（soak），并通过可审计的 arm 事务、由人工对高风险自动化授权后再正式启用会产生变更的循环。默认静默——只有需要人工立即处理的故障才会推送告警。
+- **`/chief`** — 在大型多会话工作中担任你的幕僚长:指挥多个 Orca 会话,把工作分给 Codex 和 Cursor,严守测试关卡,并管理设备、磁盘和额度。
 
 ## 安装
 
@@ -46,6 +47,7 @@ npx skills add zytakeshi/admin-skills@finish-translation
 npx skills add zytakeshi/admin-skills@ask-grok
 npx skills add zytakeshi/admin-skills@cdp-chrome
 npx skills add zytakeshi/admin-skills@loop-builder
+npx skills add zytakeshi/admin-skills@chief
 ```
 
 ## 可用技能
@@ -66,6 +68,7 @@ npx skills add zytakeshi/admin-skills@loop-builder
 | [ask-grok](skills/ask-grok/) | 用官方 Grok CLI（订阅 OAuth，无需 API key）向 Grok（xAI）查询实时 Web 和 X/Twitter 信息 — 最新发布、突发新闻、社区风向，回答连同来源链接原样展示 |
 | [cdp-chrome](skills/cdp-chrome/) | 在 Chrome 136+ 上让 Chrome DevTools（CDP）自动化无人值守运行 — 用 `--browserUrl` 连接专用的已登录 Chrome，从此不再弹「Allow remote debugging?」授权框；附 `cdp-chrome` 脚本（start / reseed / status / config）。仅 macOS |
 | [loop-builder](skills/loop-builder/) | 设计、构建、测试、观察运行并安全启用无人值守自动化循环（cron / launchd / systemd timer / 定时 agent / 守护进程）— 执行体/调度器选型、安全契约、dry-run 优先、回滚准备、证据门观察运行、可审计的 arm 事务 |
+| [chief](skills/chief/) | 以幕僚长的方式运行大型多会话工作:分配任务、严守关卡、管理设备、磁盘和额度 |
 
 ## 使用方法
 
