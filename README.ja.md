@@ -12,7 +12,7 @@ Claude Code 向けのシステム管理・DevOps スキル集です。デプロ�
 - **`/commit-push`** — diff を分析して conventional commit メッセージを生成し、安全にプッシュ。「fix stuff」コミットとはお別れ。
 - **`/create-pr`** — PR を作成し、[OpenAI Codex](https://chatgpt.com/codex) が自動レビュー。レビュー完了後、Claude がフィードバックを読み取り、同意した指摘を修正してプッシュし、マージを提案 — エンドツーエンドで完全自動化。
 - **`/html`** — ライト／ダーク表示の自動切替と英語・簡体字中国語・日本語の内容を備えた**単一ファイルのアニメーション HTML** 解説を生成。標準では外部依存なし。CDN ライブラリを使う場合はバージョン固定とフォールバックが必要です。
-- **`/codex`** — OpenAI Codex CLI への橋渡し。コードレビュー、設計相談、バグ調査、セキュリティ監査、セカンドオピニオン用。イベントをストリーミングで通知し、最終回答を実行ごとの結果ファイルに保存。diff の外側の cross-cutting な統合問題も指摘。
+- **`/codex`** — OpenAI Codex CLI への橋渡し。コードレビュー、設計相談、バグ調査、セキュリティ監査、セカンドオピニオン用。標準のガードはイベントをファイルに記録し、節目と最終ステータスを通知します。ライブ配信は明示的に要求した場合のみ。最終回答は実行ごとの結果ファイルに保存。diff の外側の cross-cutting な統合問題も指摘。
 - **`/codexloop`** — Codex を使った反復レビュー＆修正ループ。Codex がレビュー → 合意した指摘を Claude が修正 → 再レビュー → きれいになるか正直な合意不能点に到達するまで継続。回数制限なし。
 - **`/codex-test`** — ヘッドレス/無人のブラウザ・スモーク/e2e テストを Codex CLI にオフロード。隔離された Playwright ブラウザを操作（必要な場合のみログイン済み Chrome セッションに接続）し、フローが通るまでコードを修正して再実行可能。進捗をストリーミングし、PASS/FAIL の判定と加えた変更を報告。
 - **`/ask-chatgpt-pro`** — ChatGPT のブラウザ UI で利用可能な最強の GPT Pro モデルに相談。重要な仕様、アーキテクチャ/移行判断、比較、ソース付き調査、批評に使い、その後ローカルで検証・適用します。
@@ -58,7 +58,7 @@ npx skills add zytakeshi/admin-skills@chief
 | [commit-push](skills/commit-push/) | 変更を分析し、コミットメッセージを生成、ステージ・コミット・プッシュを一括実行 |
 | [create-pr](skills/create-pr/) | PR の全ライフサイクルを自動化: コミット、プッシュ、PR 作成、Codex レビュー待機、修正、マージ |
 | [html](skills/html/) | 単一ファイルのアニメーション HTML 解説 — ライト／ダーク自動切替、英語・簡体字中国語・日本語、標準では外部依存なし |
-| [codex](skills/codex/) | OpenAI Codex CLI へのブリッジ。コードレビュー・設計相談・セキュリティ監査・セカンドオピニオン、進捗ストリーミング付き |
+| [codex](skills/codex/) | OpenAI Codex CLI へのブリッジ。コードレビュー・設計相談・セキュリティ監査・セカンドオピニオン。イベントを記録し、要求時にライブ進捗を配信 |
 | [codexloop](skills/codexloop/) | Codex を使った反復レビュー＆修正ループ。きれいになるか正直な合意不能点まで継続 |
 | [codex-test](skills/codex-test/) | ヘッドレス/無人のブラウザ・スモーク/e2e テストを Codex CLI にオフロード — Playwright 優先（隔離ブラウザ）、コード修正＆再実行可、PASS/FAIL を報告 |
 | [ask-chatgpt-pro](skills/ask-chatgpt-pro/) | ChatGPT ブラウザ UI の GPT Pro モデルに相談。重要な仕様、アーキテクチャ/移行判断、比較、ソース付き調査、批評に使い、ローカルで検証・適用 |
