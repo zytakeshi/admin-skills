@@ -56,6 +56,8 @@ Use conventional commits, matching the repository's existing style when possible
 - Under 72 characters
 - Capture the "why" or high-level "what", not low-level details
 
+**Verification trailer.** Every commit message ends with one `Verified: <how>` line, placed above any `Co-Authored-By` lines: `Verified: e2e macOS`, `Verified: staging`, `Verified: unit`, `Verified: none`. `none` is a valid value; never leave the line out. If the repo's `verify` skill ran in this session, copy the value from its report. Unverified commits are then queryable: `git log --grep '^Verified: none'`.
+
 **For multi-area changes**, use a summary line + bullet body:
 
 ```
