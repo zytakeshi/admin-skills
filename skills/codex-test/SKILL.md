@@ -1,6 +1,6 @@
 ---
 name: codex-test
-description: "Offload an unattended headless/smoke/e2e TEST RUN to the OpenAI Codex CLI: Codex drives a browser (Playwright MCP preferred), may fix code/tests/config, and re-runs until the flow passes; Claude supplies creds, URLs, success criteria and reports the verdict. Triggers: /codex-test, 'offload this test to codex', 'unattended/headless browser test', 'delegate the e2e/smoke test'. NOT for live log-tailing, interactive debugging, or real-device iOS/Android testing (use webapp-testing / playwright / maestro-e2e)."
+description: "Offload an unattended headless/smoke/e2e TEST RUN to the OpenAI Codex CLI: Codex drives a browser (Playwright MCP preferred), may fix code/tests/config, and re-runs until the flow passes; Claude supplies creds, URLs, success criteria and reports the verdict. Triggers: /codex-test, 'offload this test to codex', 'unattended/headless browser test', 'delegate the e2e/smoke test'. NOT for live log-tailing, interactive debugging, or real-device iOS/Android testing (keep those yourself; webapp-testing covers Claude-run browser tests)."
 
 ---
 
@@ -16,7 +16,7 @@ $ARGUMENTS
 
 ## Step 0 — DECISION GATE: delegate or keep? (do this FIRST)
 
-Classify the test. **Delegate to Codex ONLY** if it is headless / unattended / smoke / e2e and can run fully autonomously in a browser. **KEEP it yourself** (run via `webapp-testing` / `playwright` / `maestro-e2e`) if it needs ANY of:
+Classify the test. **Delegate to Codex ONLY** if it is headless / unattended / smoke / e2e and can run fully autonomously in a browser. **KEEP it yourself** (browser tests via `webapp-testing`; device work directly) if it needs ANY of:
 
 1. **Live log monitoring** — tailing/interpreting streaming server or device logs *as the test runs*.
 2. **Interactive debugging** — stepping, breakpoints, root-cause spelunking, bisecting a *flaky / unknown* failure.
@@ -24,7 +24,7 @@ Classify the test. **Delegate to Codex ONLY** if it is headless / unattended / s
 
 | DELEGATE to Codex (✅) | KEEP — Claude runs it (⛔) |
 |---|---|
-| Headless web e2e flow (login → checkout → confirm) | Anything on a real iPhone/Android or simulator/emulator → `maestro-e2e` |
+| Headless web e2e flow (login → checkout → confirm) | Anything on a real iPhone/Android or simulator/emulator → keep it yourself |
 | Browser smoke test of a staging/local URL | Tailing server/device logs to diagnose a failure live |
 | "Deploy to staging then smoke-test it" (non-prod) | Debugging a flaky/unknown failure (breakpoints, bisect) |
 | API e2e flow / endpoint contract check | Xcode / devicectl / TestFlight install + launch verification |
@@ -116,7 +116,6 @@ umask 077          # PROMPT_FILE holds injected credentials → 0600
 #     the guard own the events file (no `| tee`).
 bash ~/.claude/skills/codex/scripts/codex-guard.sh "$TASK_ID" 1800 -- \
   codex exec --json --sandbox danger-full-access --skip-git-repo-check \
-  -c service_tier=priority \
   -c mcp_servers.playwright.enabled=true \
   -c mcp_servers.chrome-devtools.tools.new_page.approval_mode=auto \
   -c mcp_servers.chrome-devtools.tools.take_snapshot.approval_mode=auto \
@@ -135,8 +134,8 @@ bash ~/.claude/skills/codex/scripts/codex-guard.sh "$TASK_ID" 1800 -- \
 | `-c mcp_servers.chrome-devtools.tools.new_page.approval_mode=auto` / `…take_snapshot.approval_mode=auto` | Only matters on the **chrome-devtools exception path** (already-logged-in session). `~/.codex/config.toml` sets these two chrome-devtools tools to `approval_mode="approve"`, which would stall an unattended drive on Codex's *own* tool-approval prompt. The valid per-tool values are `auto`, `prompt`, `approve` — set `auto` for unattended runs. ⚠️ `never` is **not** a valid per-tool `approval_mode`; it makes config loading fail. If a run dies on config load, re-check the accepted values against the installed CLI's own help rather than assuming this list. The hyphen in `chrome-devtools` needs no quoting in the dotted `-c` path. Harmless to leave in on Playwright-only runs. |
 | `"$(cat "$PROMPT_FILE")"` (prompt argv word) | Builds the prompt from a `0600` temp file at call time. The guard closes stdin, so the stdin (`-`) form is unavailable; closing stdin is also what prevents the "Reading additional input from stdin…" wedge. |
 | (no `--full-auto`) | Deprecated; hangs with `--json`. Not needed — `approval_policy="never"` already gives unattended behavior. |
-| `--json` + background + `tee` | Stream JSONL events for Monitor and capture for the post-mortem. |
-| `-c service_tier=priority` | Fast mode — lower latency, no quality loss. ⛔ Never pass `-c model_reasoning_effort`: it would OVERRIDE the `max` in `~/.codex/config.toml` with something lower. Effort comes from the config file, same rule as the `codex` skill. |
+| `--json` + background | Stream JSONL events into the guard-owned `/tmp/codex_events_${TASK_ID}.jsonl` (for the optional Monitor and the post-mortem). The guard writes that file itself — no `| tee`. |
+| ~~`-c service_tier=priority`~~ | DO NOT PASS. Fast mode costs increased usage for ~1.5× speed; the founder refused that trade on 2026-09-11 (token austerity). ⛔ Never pass `-c model_reasoning_effort` either: it would OVERRIDE `~/.codex/config.toml`. Both the model and the effort come from that config file, same rule as the `codex` skill. |
 | `--skip-git-repo-check` / `--cd` / `-o` | Run from any dir / target dir / capture the final verdict message. |
 
 Use a **generous Bash timeout — up to `600000` ms**; e2e runs are long.
@@ -158,7 +157,7 @@ Surface one-line updates (session started / running `<cmd>` / browser step / scr
 ## Step 5 — Hang detection & recovery: `codex-guard.sh` owns it, you don't
 
 Supervising the run — startup-hang detection, scoped kill, one retry, terminal status — is pure rules,
-so it belongs to a **script**, never to you or a sub-agent (global "No LLM watchdog/monitor", every tier).
+so it belongs to a **script**, never to you or a sub-agent: the guard observes the process directly, while a model watching it can only infer.
 
 **This is not a second run.** Step 3 already shows the single guard-wrapped invocation — launch that one
 command with `run_in_background: true`. Do not issue a bare `codex exec` anywhere in this skill.
@@ -206,8 +205,8 @@ Codex's edits are **real working-tree changes** — list them so the user can re
 
 - `/codex` — read-only code review/consultation (no writes, no browser).
 - `/codexloop` — iterative review-then-fix loop until clean.
-- `webapp-testing` / `playwright` — Claude's own browser testing (the KEEP path + the codex-unavailable fallback).
-- `maestro-e2e` — real-device iOS/Android e2e (always KEEP — never delegate to codex-test).
+- `webapp-testing` — Claude's own browser testing (the KEEP path + the codex-unavailable fallback).
+- Real-device iOS/Android e2e — always KEEP; never delegate to codex-test.
 - `deploy` — production deploys stay gated there, not in this skill.
 
 ---
@@ -224,7 +223,7 @@ Codex's edits are **real working-tree changes** — list them so the user can re
 
 **Counter-examples (this skill REFUSES → Claude keeps them):**
 ```
-/codex-test run the iOS app login test on the simulator     → use maestro-e2e (real-device, not delegable)
+/codex-test run the iOS app login test on the simulator     → real-device/simulator work, keep it yourself
 /codex-test watch the server logs while reproducing the 502 → log-monitoring, keep it (webapp-testing + log tail)
 /codex-test figure out why the e2e is flaky sometimes       → interactive debugging, keep it
 ```

@@ -60,6 +60,12 @@ RESULT="/tmp/codex_result_${TASK_ID}.txt"
 EVENTS="/tmp/codex_events_${TASK_ID}.jsonl"
 STATUS_FILE="/tmp/codex_status_${TASK_ID}.txt"
 
+# A reused TASK_ID must not inherit an earlier run: a stale result reads as COMPLETED, and stale
+# JSONL events skip the startup gate. Move them aside (never delete) before launching.
+for f in "$RESULT" "$EVENTS"; do
+  [ -e "$f" ] && mv "$f" "$f.stale-$(date +%Y%m%d-%H%M%S)-$$"
+done
+
 STARTUP_TIMEOUT="${CODEX_GUARD_STARTUP:-120}"
 POLL="${CODEX_GUARD_POLL:-10}"
 HEARTBEAT="${CODEX_GUARD_HEARTBEAT:-600}"
@@ -85,8 +91,13 @@ kill_run() { # $1=pid — kill only THIS run's tree, scoped by TASK_ID in argv
   kill "$1" 2>/dev/null
   sleep 2
   kill -9 "$1" 2>/dev/null
-  pkill -9 -f "codex_result_${TASK_ID}" 2>/dev/null
-  pkill -9 -f "codex_events_${TASK_ID}" 2>/dev/null
+  # LC_ALL=C: in a UTF-8 locale macOS `pkill -f` aborts ("illegal byte sequence", rc 3) when ANY
+  # process argv holds CJK text, so the scoped kill silently missed. rc 1 = nothing left to kill.
+  local pat rc
+  for pat in "codex_result_${TASK_ID}" "codex_events_${TASK_ID}"; do
+    LC_ALL=C pkill -9 -f "$pat"; rc=$?
+    [ "$rc" -gt 1 ] && echo "codex-guard: WARN pkill -f ${pat} failed rc=${rc} — run may be orphaned"
+  done
   true
 }
 
@@ -165,14 +176,16 @@ for attempt in 1 2; do
   wait "$pid" 2>/dev/null; rc=$?
 
   # ---- Post-exit evaluation ----
-  if [ -s "$RESULT" ]; then
+  # A non-zero exit means the command itself reported failure (e.g. codex-airgate's route check):
+  # never read a result file it left behind as success.
+  if [ -s "$RESULT" ] && [ "$rc" -eq 0 ]; then
     [ "$attempt" -eq 1 ] && finish COMPLETED "result: ${RESULT}"
     finish RECOVERED "result: ${RESULT} (after 1 startup-hang retry)"
   fi
-  echo "codex-guard: attempt ${attempt} exited rc=${rc} with empty/missing result"
+  echo "codex-guard: attempt ${attempt} exited rc=${rc} with a failure exit or an empty/missing result"
   if [ "$attempt" -eq 2 ] || [ "$started" -eq 1 ]; then
     # started-then-crashed: retrying rarely helps and burns the cap — report.
-    finish FAILED "codex exited rc=${rc} without writing ${RESULT}." "$(diagnostics "$pid")"
+    finish FAILED "codex exited rc=${rc} (result file empty, missing, or not trusted because rc != 0): ${RESULT}." "$(diagnostics "$pid")"
   fi
   # not started + quick crash → one retry
 done

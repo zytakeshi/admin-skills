@@ -19,44 +19,40 @@ The viewer must, in one scroll, walk away with the **one key insight** you set o
 
 ---
 
-## Execution path — check usage, then delegate
+## Execution path — Claude on Antigravity first, behind a usage gate
 
-For this skill, the calling agent (Claude, Codex, or another compatible agent) is the **orchestrator and reviewer — not the author**. Delegate the generation job to a coding CLI. Delegate unless the user explicitly opts out or names a generator.
+**Model families (founder 2026-10-16).** Antigravity runs Claude first; Gemini **Argon** is the only Gemini model allowed, and only on Antigravity as the fallback when the Claude usage gate fails. No other Gemini model (e.g. Flash) anywhere; Cursor and the native fallback stay Claude.
 
-**Generator priority — check usage first, then take the highest rank that still has quota:**
+For this skill, the calling agent (Claude, Codex, or another compatible agent) is the **orchestrator and reviewer — not the author**. Delegate the generation job to a coding CLI unless the user opts out or names a permitted generator.
 
-| Rank | Generator | Model | Why it can drop |
-|------|-----------|-------|-----------------|
-| 1 | Antigravity CLI (`agy`) | the newest Gemini Flash model at its highest effort tier (list with `agy models`; pick the highest `gemini-*-flash-*` version with the `-high` suffix) | Its own `/usage` report shows the Gemini quota is spent |
-| 2 | Cursor CLI (`cursor`) | its highest-effort Grok model (list with `cursor models`; pick the newest `cursor-grok-*` at the highest effort suffix) | The run returns a quota or rate-limit error |
-| 3 | Grok CLI (`grok`) | the model configured in the Grok CLI | The run returns a quota, credit, or rate-limit error |
-| 4 | Codex CLI (`codex exec`) | the model in `~/.codex/config.toml` | Last resort — no rank below it |
+**Pick the tier first (founder 2026-10-15).** Default = **brief tier**: Claude **Sonnet**. Use the **design tier** (Claude **Opus**, newest available) only when the user asks for good design or complex work such as motion. Never use Opus for a plain brief.
 
-Model ids move. Resolve the id at run time from `agy models` / `cursor models`; never write a slug into this file. If a run rejects an id, take the nearest equivalent of the same family and effort. Gemini Flash at high effort ranks first because it produced an equivalent page in a fraction of the wall-clock time of the Claude thinking model.
+**Reasoning effort = LOW at every rank and both tiers (founder 2026-10-17).** HTML generation is mostly output, not reasoning: a 2026-10-16 high-effort run spent ~14 min thinking before it wrote a byte. If the low-effort file fails the defensive checklist, retry ONCE at medium with a narrower prompt, then drop to the next rank.
 
-### Step 0 — check usage before you pick a generator
+**Generator priority — take the highest available rank:**
 
-Antigravity reports its own quota headlessly. Run this first, every time:
+| Rank | Generator | Brief tier model | Design tier model | Why it can drop |
+|------|-----------|------------------|-------------------|-----------------|
+| 1 | Antigravity CLI (`agy`) — Claude | newest Claude **Sonnet**, low (resolve with `agy models`) | newest Claude **Opus**, low (resolve with `agy models`) | the **usage gate** below fails, authentication fails, or the run fails |
+| 2 | Antigravity CLI (`agy`) — Gemini Argon | newest Gemini **Argon**, low | newest Gemini **Argon**, low | the Gemini Argon usage row is below the gate, authentication fails, or the run fails |
+| 3 | Cursor CLI (`cursor`) | Cursor's Claude **Sonnet**, low effort (resolve using the `cursor` skill) | Cursor's Claude **Opus**, low effort (resolve using the `cursor` skill) | The run returns a quota or rate-limit error, or the model is not on the roster |
+| 4 | Claude itself — a native sub-agent (`Agent` tool) | `model: sonnet`, effort low | `model: opus`, effort low | Last resort — no rank below it |
+
+Model ids move. Resolve Antigravity models with `agy models` and the Cursor Claude model with the Cursor skill's current model-discovery method; never pin a slug here. In Antigravity, always pass `--model` explicitly — never use the default model. Do not substitute any other model family at any rank.
+
+**Usage gate — run it BEFORE starting any Antigravity job (founder 2026-10-16).** A run that exhausts quota mid-way wastes the whole run: on 2026-10-16 an `agy` Claude Opus design run ran ~19 min, then failed with `RESOURCE_EXHAUSTED (429)`, and the "Claude and GPT models" rows fell from 100% (5-hour) / 91% (weekly) to 0% / 7%. So check first, then start:
 
 ```bash
-agy --print "/usage"
+agy --print "/usage" 2>&1 | awk -F'\t' 'NF>=3 {print $1" | "$2" | "$3}'
 ```
 
-It prints four tab-separated rows — model family, window, remaining percent, reset time:
+| Generator | Row(s) to read | Start only if remaining ≥ |
+|---|---|---|
+| Rank 1, brief tier (Claude Sonnet) | "Claude and GPT models" — Five Hour **and** Weekly | 5-hour 40% **and** weekly 15% |
+| Rank 1, design tier (Claude Opus) | "Claude and GPT models" — Five Hour **and** Weekly | 5-hour 80% **and** weekly 30% |
+| Rank 2 (Gemini Argon) | "Gemini Models" Five Hour **and** the row whose name contains "Argon" (e.g. "Gemini 4 Argon") Weekly | 5-hour 40% **and** weekly 25% (measured 2026-10-17: one high-effort brief used 20 points of the Argon weekly limit, 90% → 70%) |
 
-```text
-Gemini Models              Weekly Limit Remaining       94%    2026-08-23T14:35:30Z
-Gemini Models              Five Hour Limit Remaining    98%    2026-08-23T00:08:22Z
-Claude and GPT models      Weekly Limit Remaining      100%    2026-08-29T22:25:15Z
-Claude and GPT models      Five Hour Limit Remaining   100%    2026-08-23T03:25:15Z
-```
-
-Read the two **"Gemini Models"** rows, because the rank-1 Gemini Flash model draws on that pool:
-
-- Both rows above **15%** → use rank 1 (`agy`).
-- Either row at **15% or below**, or the check fails → drop to rank 2 (`cursor`).
-
-Cursor, Grok and Codex expose no headless usage command. Verified: `cursor status --format json` returns authentication only, and `codex exec --json` reports token counts, not quota. So their usage surfaces at run time — a quota, credit, or rate-limit error in the run's output means drop to the next rank and say so. Report which generator ran and why, so the user is never guessing which model wrote the page.
+These thresholds are a first estimate from that single measured run; after each run, report the rows before and after so they can be tuned. If a row is missing or `/usage` fails, do not guess: treat the gate as failed for that rank and move to the next rank. Report which generator ran, the usage rows you read, and why any rank was skipped. The standalone Grok CLI, Grok models in Cursor, and Codex are not permitted generators or fallbacks for this skill.
 
 **Why delegate: token discipline.** The whole point of this skill is to keep a substantial multilingual artifact *out of the orchestrator's context window*. The generator writes the file straight to disk; you never read it back in full and you never let it stream into chat. Validation is therefore deliberately lightweight (see *Validate frugally* below). If you catch yourself reading the entire HTML into context, opening it in a headless browser, or taking screenshots, you have defeated the skill's purpose — stop.
 
@@ -71,24 +67,25 @@ Before delegation, put the defaults directly in the self-contained prompt:
 2. Write a short, self-contained delegation prompt that includes the user's request, the chosen path, and the requirements in this skill.
 3. Run the chosen generator in non-interactive print mode and let it create the `.html` file.
 
-**Rank 1 — Antigravity (`agy`).** Put the prompt immediately after `--print`; otherwise the CLI may treat the next flag as the prompt.
+**Rank 1 — Antigravity (`agy`), Claude Sonnet (brief) or Claude Opus (design).** Start here once the usage gate passes. **Rank 2** uses the same command with the newest Gemini Argon model, low effort.
 
 ```bash
-cd "<output-directory-or-workspace-root>" && \
 agy --dangerously-skip-permissions \
-  --model "<model from `agy models`>" \
+  --model "<rank 1: Claude Sonnet (brief) / Claude Opus (design); rank 2: Gemini Argon — all at LOW effort, from `agy models`>" \
   --add-dir "<output-directory-or-workspace-root>" \
   --print "$(cat "<delegation-prompt>.md")" \
   --print-timeout 15m
 ```
 
-Use `--add-dir` for the directory where the file should be written. Use `--dangerously-skip-permissions` only for this delegated local artifact generation flow so Antigravity can create the file without stalling on tool prompts.
+Scope writes to the artifact directory. Always pass the explicit model; never use Antigravity's default model.
 
-**Rank 2 — Cursor (`cursor`), Grok model.** Use it when Step 0 shows the Gemini pool is spent, or when `agy` fails twice.
+**`agy` can finish the file and then hang (measured 2026-11-12).** A Claude Opus low design run wrote a 105 KB page in about 3 minutes, then waited on one of its own background tasks until `--print-timeout` (exit 3, `DEADLINE_EXCEEDED`). When the run ends with that error, check the output file and its modification time before you drop a rank: the file can be complete. That run moved the "Claude and GPT models" rows from 100% / 48% to 62% / 28% (five-hour / weekly).
+
+**Rank 3 — Cursor, Claude Sonnet (brief) or Claude Opus (design).** Use when both Antigravity ranks are unavailable or gated out. Follow the `cursor` skill for the current CLI entrypoint and model discovery. Pick the low-effort Claude model of the chosen tier (never a `-fast` variant); if none is on the roster, advance to rank 4.
 
 ```bash
-cursor -p "$(cat "<delegation-prompt>.md")" \
-  --model "<model from `cursor models`>" \
+cursor agent -p "$(cat "<delegation-prompt>.md")" \
+  --model "<Claude Sonnet or Opus model resolved using the `cursor` skill>" \
   --force --sandbox enabled \
   --workspace "<output-directory-or-workspace-root>" \
   --output-format stream-json \
@@ -101,36 +98,7 @@ cursor -p "$(cat "<delegation-prompt>.md")" \
 - Run it in the background. Watch progress with the `cursor` skill's filter, then take the final report with `jq -r 'select(.type=="result") | .result'`.
 - **Check the path Cursor actually wrote before you trust its report.** A normal project path is safe (verified: `~/Downloads/cursor_pathtest/hello.html` landed exactly). But when a directory name in the path starts with `-`, a verified probe saw Cursor fold that segment into its parent, write the file on the normalized path, and still report success. Run `[ -f "<absolute-output-path>" ] || find "$(dirname "<absolute-output-path>")/.." -name '<basename>' 2>/dev/null` and move the file into place if it went astray.
 
-**Rank 3 — Grok CLI (`grok`).** Use it when Cursor drops out. Grok is a full agentic coder; run it in write mode scoped to the output directory (verified working):
-
-```bash
-grok --prompt-file "<delegation-prompt>.md" \
-  --permission-mode bypassPermissions \
-  --no-plan \
-  --cwd "<output-directory-or-workspace-root>" \
-  </dev/null \
-  > /tmp/grok_html_events.jsonl 2> /tmp/grok_html.err
-```
-
-- `--permission-mode bypassPermissions` is the write-capable analog to `agy --dangerously-skip-permissions`; do NOT add a read-only `--tools` allowlist here (that blocks `write_file`). Leave default tools on so `write_file` is available.
-- Run it in the background and watch progress with the Grok progress filter (see the `grok` skill); the file is written via Grok's silent `write_file` tool, and Grok's final text is its self-validation report.
-- Note: Grok may *claim* it "used agy" — a confabulation. Ignore the claim; verify the file on disk per *Validate frugally*.
-
-**Rank 4 — Codex (`codex exec`).** Last resort, and the only rank with no fallback below it.
-
-```bash
-codex exec \
-  --sandbox workspace-write \
-  --skip-git-repo-check \
-  --cd "<output-directory-or-workspace-root>" \
-  -o /tmp/codex_html_<TASK_ID>.md \
-  "$(cat "<delegation-prompt>.md")" \
-  </dev/null
-```
-
-- `--skip-git-repo-check` is required outside a git repository; without it the run exits 1.
-- Close stdin with `</dev/null`, or `codex exec` waits on a reader.
-- `-o` writes the final self-check report to a file, which keeps the report out of your context until you need it.
+**Rank 4 — Claude itself, as a native sub-agent.** Last resort, and the only rank with no fallback below it. Spawn one `Agent` with `model: "sonnet"` (brief tier) or `model: "opus"` (design tier), effort low set explicitly, and the same self-contained delegation prompt. The sub-agent writes the file to disk and replies with the path and the PASS/FAIL note only, which keeps the HTML out of your context.
 
 The delegation prompt must contain this contract:
 
@@ -149,7 +117,7 @@ Follow the html skill's standards: visual-first, before/after contrast, animated
 After writing the file, run through the html skill's defensive checklist yourself and reply with the path and a concise PASS/FAIL note per item (self-contained, all three languages complete, no-JS full content, no console errors, responsive, reduced-motion, favicon, keyboard-accessible, approx KB). Do not paste the full HTML.
 ```
 
-If a generator is missing, not authenticated, out of quota, or fails to write the file, retry it once with a narrower prompt, then **drop to the next rank** and say which rank you moved to and why. Fall back to the calling agent writing the HTML directly only after rank 4 also fails, and mention every failure in the final response.
+If a generator is missing, not authenticated, out of quota, or fails to write the file, retry it once with a narrower prompt, then **drop to the next rank** and say which rank you moved to and why. Write the HTML in the calling agent directly only after rank 3 also fails, and mention every failure in the final response.
 
 ### Validate frugally — do not read the file back into context
 
@@ -306,6 +274,8 @@ This subsection overrides the default “Validate frugally / do not open a headl
 - At minimum test 320px, 768px, and 1440px; JavaScript on and off; reduced motion; load and interaction console errors; keyboard access; and the primary interaction's expected DOM/visual change.
 - Charts additionally test actual marks, axes, longest labels, tooltips, and every series toggle. Maps additionally test loaded geometry, joins, projections, labels, and framed locations. Simulators additionally test boundary inputs, deterministic reset, play/pause/step behavior, and duplicate-loop prevention.
 - A failed assertion is a delivery blocker. Fix it and re-run the failing browser check; never downgrade it to a self-reported checklist pass.
+
+**Screenshot helper (when the user asks for screenshots, or for the scoped exception above):** `scripts/page-shot.zsh <abs-html> <abs-out.png> <width> <height> <auto|dark|attr-light|attr-dark> [anchor-id]`. It renders the page in an iframe of the exact width, because a headless Chrome window is never narrower than 500px and `--window-size=390` does not give a phone layout. It prints `scrollWidth` and `clientWidth` (unequal = horizontal page scroll). Use `attr-light` / `attr-dark` when the page supports `<html data-theme>`: on a Mac in dark mode there is no other way to force light. Save the PNG files and read only a few.
 
 ---
 
@@ -468,13 +438,14 @@ body { font-size: 18px; line-height: 1.7; }
 ```
 
 ```css
-.reveal {
+/* Hidden only when JS is on: a first-line inline script adds .js to <html> (static-first rule). */
+.js .reveal {
   opacity: 0;
   transform: translateY(36px);
   transition: opacity .7s cubic-bezier(.22,1,.36,1),
               transform .7s cubic-bezier(.22,1,.36,1);
 }
-.reveal.visible { opacity: 1; transform: translateY(0); }
+.js .reveal.visible { opacity: 1; transform: translateY(0); }
 .reveal-delay-1 { transition-delay: .1s; }
 .reveal-delay-2 { transition-delay: .2s; }
 .reveal-delay-3 { transition-delay: .3s; }
@@ -562,17 +533,17 @@ start();
 <svg viewBox="0 0 900 240" width="100%" role="img" aria-label="System architecture">
   <defs>
     <marker id="arrow-cyan"  viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
-      <path d="M0,0 L10,5 L0,10 z" fill="#00d4ff"/>
+      <path d="M0,0 L10,5 L0,10 z" style="fill: var(--cyan)"/>
     </marker>
     <marker id="arrow-red"   viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
-      <path d="M0,0 L10,5 L0,10 z" fill="#ff4757"/>
+      <path d="M0,0 L10,5 L0,10 z" style="fill: var(--red)"/>
     </marker>
   </defs>
   <!-- nodes -->
-  <rect x="40"  y="90" width="160" height="60" rx="10" fill="#111840" stroke="#00d4ff"/>
-  <text x="120" y="125" text-anchor="middle" fill="#e8eaf6" font-size="14">Client</text>
+  <rect x="40"  y="90" width="160" height="60" rx="10" style="fill: var(--bg3); stroke: var(--cyan)"/>
+  <text x="120" y="125" text-anchor="middle" font-size="14" style="fill: var(--text)">Client</text>
   <!-- arrow -->
-  <line x1="200" y1="120" x2="380" y2="120" stroke="#00d4ff" stroke-width="2"
+  <line x1="200" y1="120" x2="380" y2="120" stroke-width="2" style="stroke: var(--cyan)"
         marker-end="url(#arrow-cyan)"/>
 </svg>
 ```
@@ -598,7 +569,7 @@ Use `step-active` and `step-dim` classes to color-code which steps light up vers
 
 ```css
 @keyframes danger-pulse {
-  0%,100% { box-shadow: 0 0 0 0 var(--red-glow); }
+  0%,100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--red) 40%, transparent); }
   50%     { box-shadow: 0 0 0 14px rgba(255,71,87,0); }
 }
 @keyframes honey-pulse {
@@ -744,10 +715,3 @@ Never silently ship something broken.
 | "Build a dashboard for these monthly revenue numbers"        | Inline data array → SVG bar/line chart with hand-rolled axes, hover tooltips      |
 | "Show how our system architecture flows from A to B"         | One scene, big inline SVG with `<defs><marker>` arrowheads, layered reveals       |
 | "Make a one-pager that pitches the product"                  | Hero + 3 feature cards + comparison table + CTA, all under 50 KB                  |
-
----
-
-## See also
-
-- Memory: `feedback_tech_doc_visualizer.md` — sticky TOC scroll-spy, code cards with clipboard fallback, theme toggle via `localStorage`.
-- Memory: `feedback_security_dashboard_style.md` — security review dashboard variant.

@@ -1,24 +1,15 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
-## Project Overview
-
-**admin-skills** is a Claude Code skills package (`zytakeshi/admin-skills`) providing sysadmin and DevOps automation workflows. Skills are installed via `npx skills add zytakeshi/admin-skills`.
+**admin-skills** is a public Claude Code skills package (`zytakeshi/admin-skills`) of sysadmin and DevOps workflows, installed via `npx skills add zytakeshi/admin-skills`.
 
 ## Architecture
 
-Each skill is a `SKILL.md` file inside `skills/<skill-name>/`, with YAML frontmatter (name, description, trigger phrases) followed by step-by-step instructions Claude executes at runtime. Most skills are pure declarative markdown; a few also bundle a `scripts/` directory with an executable helper (e.g. `skills/ask-grok/scripts/ask_grok.sh`). Skills that bundle scripts must reference them relative to the skill's own directory (not a hardcoded absolute path) so they resolve regardless of install location.
-
-### Current Skills
-
-Skill list: see `skills/*/SKILL.md` frontmatter (this table went stale; frontmatter is authoritative).
+Each skill is `skills/<skill-name>/SKILL.md`: YAML frontmatter, then the steps Claude runs. Skill list: `skills/*/SKILL.md` frontmatter is authoritative. Some skills bundle a `scripts/` helper (e.g. `skills/ask-grok/scripts/ask_grok.sh`); reference it relative to the skill's own directory, never by absolute path, so it resolves wherever the package installs.
 
 ## Skill Authoring Conventions
 
 - **Frontmatter**: `name` (kebab-case), `description` (what the skill does + the intent categories that should route to it; add a literal trigger phrase only when a real miss shows the categories did not catch it — descriptions ride in every session's skill listing)
 - **Safety-first**: Every skill that touches production must include backup/rollback steps. Never use `rm -rf`. Never stage `.env` or credential files.
-- **Parallel where possible**: Group independent shell commands to run in parallel (e.g., `git status` + `git diff` + `git log`)
 - **Explicit staging**: Always `git add <specific-files>`, never `git add -A` or `git add .`
 - **Conventional commits**: Skills that create commits use the format `type: description` (feat, fix, refactor, chore, docs, style, test, perf, ci, build)
 
