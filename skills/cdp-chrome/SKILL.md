@@ -1,19 +1,7 @@
 ---
 name: cdp-chrome
 description: >-
-  Run Chrome DevTools (CDP) browser automation UNATTENDED on Chrome 136+ by
-  attaching to a dedicated, already-logged-in Chrome instance instead of your
-  default profile — so the native "Allow remote debugging?" consent dialog never
-  appears. Use this skill whenever you set up, debug, or run chrome-devtools-mcp /
-  Puppeteer / Playwright against a real logged-in Chrome and hit any of: the
-  "Allow remote debugging?" dialog, a hang on connect/list_pages, "DevTools remote
-  debugging requires a non-default data directory", --remote-debugging-port being
-  silently ignored, or "I need browser automation to run without a human clicking
-  a permission prompt". Triggers: "chrome-devtools won't connect", "allow remote
-  debugging dialog", "unattended browser automation", "headless CDP login",
-  "cdp-chrome", "browserUrl vs autoConnect", "chrome 136 remote debugging broken",
-  "switch to autoConnect mode", "attach to my real Chrome", "auto-click the allow
-  remote debugging dialog", "chrome 144 allow dialog every session".
+  Run Chrome DevTools (CDP) automation unattended on Chrome 136+ by attaching to a dedicated logged-in Chrome instance, so the 'Allow remote debugging?' dialog never appears. Use for chrome-devtools-mcp / Puppeteer / Playwright against a real Chrome. Triggers: 'chrome-devtools won't connect', 'allow remote debugging dialog', hang on connect/list_pages, 'requires a non-default data directory', --remote-debugging-port ignored, 'unattended browser automation', 'headless CDP login', 'browserUrl vs autoConnect', 'attach to my real Chrome', 'chrome 144 allow dialog every session'.
 ---
 
 # cdp-chrome — unattended Chrome DevTools automation on Chrome 136+
@@ -170,11 +158,11 @@ Override defaults via env:
 
 ## Auto-clicking the autoConnect dialog (EXPERIMENTAL — last resort)
 
-> ⛔ **Policy: `--autoConnect` is not an approved attach mode.** The global instructions require every
-> CDP client to attach via `--browserUrl http://127.0.0.1:9222` (`copied` mode). The autoconnect
-> material below is kept as **reference only** — so you recognise the dialog trap and know how to get
-> out of it — not as a mode to select. Do not run `cdp-chrome mode autoconnect` as part of normal work;
-> if a task seems to need the real live profile, use `cdp-chrome reseed` on the copied profile instead.
+> ⛔ **Policy: `--autoConnect` is not an approved attach mode.** The global browser rule allows two surfaces:
+> this skill's `copied` mode (`--browserUrl http://127.0.0.1:9222`) by default, and the official Chrome
+> browser-extension control in a new task tab when a named workflow explicitly needs the user's existing Chrome
+> state. The autoconnect material below is kept as **reference only** — so you recognise the dialog trap and know
+> how to get out of it — not as a mode to select. Do not run `cdp-chrome mode autoconnect` as part of normal work.
 
 `autoconnect` mode blocks on Chrome's un-suppressible "Allow remote debugging?" bubble every
 session (see *Two attach modes*). `cdp-chrome allow-watch` is a **workaround of last resort**,

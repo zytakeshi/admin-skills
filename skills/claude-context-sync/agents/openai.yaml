@@ -1,0 +1,4 @@
+interface:
+  display_name: "Claude Context Sync"
+  short_description: "Sync redacted Claude context into Codex memory notes."
+  default_prompt: "Sync Claude global/project context into a Codex-safe memory note and validate redaction."

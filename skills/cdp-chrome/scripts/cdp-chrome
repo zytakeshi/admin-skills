@@ -45,6 +45,9 @@
 #   CDP_ALLOW_ORIGINS=""   (UNSET = no --remote-allow-origins flag; see SECURITY in SKILL.md)
 #   CDP_CLAUDE_CONFIG="$HOME/.claude.json"           # MCP host config the mode switch edits
 #   CDP_ALLOW_WATCH_SECONDS=60                        # how long `allow-watch` scans before giving up
+#   CDP_EXTRA_ARGS=""      # extra Chrome flags for `start`, space-separated (no spaces inside one flag)
+#   CDP_EXCLUDE_FROM=""    # rsync exclude file (one pattern per line) added to `reseed`'s built-in excludes
+#   CDP_OPEN_BACKGROUND=0  # 1 = launch with `open -g` so the new instance never takes focus
 #
 # SECURITY DEFAULT: CDP_ALLOW_ORIGINS is UNSET by default, so --remote-allow-origins is
 #   NOT passed. Chrome then accepts only CDP websocket connections with no Origin header
@@ -62,6 +65,9 @@ CHROME="${CDP_CHROME:-/Applications/Google Chrome.app}"   # .app bundle for open
 ALLOW_ORIGINS="${CDP_ALLOW_ORIGINS-}"   # unset → empty → flag omitted (secure default)
 CLAUDE_CONFIG="${CDP_CLAUDE_CONFIG:-$HOME/.claude.json}"   # MCP host config edited by `mode`
 WATCH_SECONDS="${CDP_ALLOW_WATCH_SECONDS:-60}"            # `allow-watch` scan budget (seconds)
+EXTRA_ARGS="${CDP_EXTRA_ARGS-}"        # optional extra Chrome flags for `start`
+EXCLUDE_FROM="${CDP_EXCLUDE_FROM-}"    # optional rsync exclude file for `reseed`
+OPEN_FLAGS="-na"; [ "${CDP_OPEN_BACKGROUND:-0}" = "1" ] && OPEN_FLAGS="-gna"   # -g: no focus steal
 MARKER="$DST/.cdp-seeded-$PROFILE_DIR"  # per-profile; written "ok" only after a complete reseed
 
 # A real CDP endpoint returns JSON containing webSocketDebuggerUrl. Use -f so HTTP
@@ -127,7 +133,9 @@ start() {
     --no-first-run --no-default-browser-check
   )
   [ -n "$ALLOW_ORIGINS" ] && args+=( --remote-allow-origins="$ALLOW_ORIGINS" )
-  open -na "$CHROME" --args "${args[@]}" about:blank
+  # read -a splits on spaces without glob expansion, so a flag value with "*" stays literal.
+  if [ -n "$EXTRA_ARGS" ]; then read -r -a extra <<< "$EXTRA_ARGS"; args+=( "${extra[@]}" ); fi
+  open $OPEN_FLAGS "$CHROME" --args "${args[@]}" about:blank
   for _ in $(seq 1 20); do is_up && { echo "up on :$PORT"; exit 0; }; sleep 1; done
   echo "failed to come up on :$PORT"; exit 1
 }
@@ -145,6 +153,11 @@ reseed() {
     echo "quit that instance first, then re-run: cdp-chrome reseed" >&2
     exit 1
   fi
+  local xf=()
+  if [ -n "$EXCLUDE_FROM" ]; then
+    [ -f "$EXCLUDE_FROM" ] || { echo "CDP_EXCLUDE_FROM file not found: $EXCLUDE_FROM" >&2; exit 1; }
+    xf=( --exclude-from="$EXCLUDE_FROM" )
+  fi
   mkdir -p "$DST/$PROFILE_DIR"
   printf 'in-progress\n' > "$MARKER"   # invalidate the marker until this reseed completes
   echo "re-seeding $DST/$PROFILE_DIR from $SRC/$PROFILE_DIR (caches excluded, mirror)…"
@@ -157,6 +170,7 @@ reseed() {
     --exclude 'ShaderCache/' --exclude 'GraphiteDawnCache/' --exclude 'DawnGraphiteCache/' \
     --exclude 'DawnWebGPUCache/' --exclude 'component_crx_cache/' \
     --exclude 'optimization_guide_model_store/' --exclude 'Singleton*' \
+    ${xf[@]+"${xf[@]}"} \
     "$SRC/$PROFILE_DIR/" "$DST/$PROFILE_DIR/" || {
       echo "reseed FAILED: rsync error — the profile copy is incomplete and was NOT" >&2
       echo "marked seeded (marker left 'in-progress'); 'start' will refuse it. Fix the" >&2
