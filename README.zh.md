@@ -8,11 +8,11 @@
 
 ## 为什么用这些技能？
 
-- **`/deploy`** — 零停机部署，强制备份、差异检测、自动清理缓存。再也不会忘记回滚方案。
+- **`/deploy`** — 通过 SSH/SCP 部署，包含强制备份、差异检测、按技术栈处理缓存和冒烟测试。停机时间取决于应用和部署方式。
 - **`/commit-push`** — 分析 diff，生成规范的 commit message，安全推送。告别 "fix stuff" 提交。
 - **`/create-pr`** — 创建 PR 后自动由 [OpenAI Codex](https://chatgpt.com/codex) 审查。审查完成后，Claude 自动读取反馈、修复认可的问题、推送修复，然后询问你是否合并 — 全流程端到端自动化。
-- **`/html`** — 生成**单文件、自包含、带动画**的 HTML 讲解页（暗色滚动叙事、CJK 字体兼容、零依赖），用于讲解概念、系统、数据或产品。
-- **`/codex`** — 桥接 OpenAI Codex CLI，用于代码审查、设计咨询、Bug 调查、安全审计与第二意见。流式推送事件，最终回答按调用 ID 存储到独立结果文件，超越 diff 本身发现跨层集成问题。
+- **`/html`** — 生成**单文件、带动画**的 HTML 讲解页，自动适配明暗主题，内含英语、简体中文和日语内容。默认无外部依赖；使用可选 CDN 库时必须固定版本并提供回退方案。
+- **`/codex`** — 桥接 OpenAI Codex CLI，用于代码审查、设计咨询、Bug 调查、安全审计与第二意见。默认由 guard 将事件记录到文件并报告阶段进度和最终状态；仅在明确要求时实时推送事件。最终回答按调用 ID 存储到独立结果文件，超越 diff 本身发现跨层集成问题。
 - **`/codexloop`** — 用 Codex 做迭代审查＋修复循环：Codex 审查 → Claude 修复认可的问题 → 再审查 → 直到代码干净或双方达成"诚实的分歧"。无固定迭代上限。
 - **`/codex-test`** — 把无头/无人值守的浏览器冒烟或 e2e 测试卸载给 Codex CLI。它驱动隔离的 Playwright 浏览器（仅在需要时接入已登录的 Chrome 会话），可修改代码并重跑直到流程通过，流式推送进度，并报告 PASS/FAIL 结论及所做改动。
 - **`/ask-chatgpt-pro`** — 在 ChatGPT 浏览器界面调用可用的最强 GPT Pro 模型，用于高风险规格、架构/迁移决策、对比、带来源的研究或批判性评审；随后在本地验证并适配结果。
@@ -22,6 +22,8 @@
 - **`/ask-grok`** — 用你现有的 X Premium / SuperGrok 订阅（无需 API key）向 Grok（xAI）查询实时 Web 和 X/Twitter 信息。把「最新进展」「突发新闻」「工具最新版本」「X 上大家在聊什么」经官方 Grok CLI 路由给 Grok，并把回答连同来源链接原样展示。
 - **`/cdp-chrome`** — 在 Chrome 136+ 上让 Chrome DevTools（CDP）浏览器自动化**无人值守**运行：连接到一个专用的、已登录的 Chrome 实例（用 `--browserUrl`），从而再也不会弹出「Allow remote debugging?」原生授权框，`chrome-devtools-mcp` / Puppeteer / Playwright 也不再卡在连接处。附带 `cdp-chrome` 辅助脚本（start / reseed / status / config）。仅 macOS。
 - **`/loop-builder`** — 引导你（或 Claude）把"把这个做成定时任务"落地为一个经过充分加固的无人值守循环：挑选合适的执行体（脚本 vs. agent）和调度器（cron / launchd / systemd timer / 定时 agent），写出带安全契约的循环规格（loop spec），先实现 dry-run，配合加锁、幂等性和可观测性，在启用前准备好回滚方案，按预先注册的证据门（evidence gate）进行验证式试运行（soak），并通过可审计的 arm 事务、由人工对高风险自动化授权后再正式启用会产生变更的循环。默认静默——只有需要人工立即处理的故障才会推送告警。
+- **`/verify`** — 提交前运行真实程序来验证改动：按 diff 选择检查，从代码外部（OS、HTTP、DB）取通过信号，确认每项检查在坏的构建上会失败，最后输出 `Verified:` 提交尾注。仓库没有自己的 verify skill 时，按成功的步骤自动生成一个。
+- **`/chief`** — 在大型多会话工作中担任你的幕僚长:指挥多个 Orca 会话,把工作分给 Codex 和 Cursor,严守测试关卡,并管理设备、磁盘和额度。
 
 ## 安装
 
@@ -46,6 +48,8 @@ npx skills add zytakeshi/admin-skills@finish-translation
 npx skills add zytakeshi/admin-skills@ask-grok
 npx skills add zytakeshi/admin-skills@cdp-chrome
 npx skills add zytakeshi/admin-skills@loop-builder
+npx skills add zytakeshi/admin-skills@verify
+npx skills add zytakeshi/admin-skills@chief
 ```
 
 ## 可用技能
@@ -55,8 +59,8 @@ npx skills add zytakeshi/admin-skills@loop-builder
 | [deploy](skills/deploy/) | 通过 SSH/SCP 部署到远程服务器，自带备份、差异检测、缓存清理和冒烟测试 |
 | [commit-push](skills/commit-push/) | 分析改动，生成 commit message，一键暂存、提交、推送 |
 | [create-pr](skills/create-pr/) | PR 全生命周期自动化：提交、推送、创建 PR、等待 Codex 审查、修复问题、合并 |
-| [html](skills/html/) | 生成单文件动画 HTML 讲解页 — 滚动叙事、CJK 兼容、零依赖 |
-| [codex](skills/codex/) | 桥接 OpenAI Codex CLI，做代码审查、设计咨询、安全审计与第二意见，带进度流式推送 |
+| [html](skills/html/) | 生成单文件动画 HTML 讲解页 — 自动适配明暗主题、英语/简中/日语内容、默认无外部依赖 |
+| [codex](skills/codex/) | 桥接 OpenAI Codex CLI，做代码审查、设计咨询、安全审计与第二意见，记录事件，按需实时推送进度 |
 | [codexloop](skills/codexloop/) | 用 Codex 做迭代审查＋修复循环，直到代码干净或双方达成诚实分歧 |
 | [codex-test](skills/codex-test/) | 把无头/无人值守的浏览器冒烟或 e2e 测试卸载给 Codex CLI — Playwright 优先（隔离浏览器），可改代码并重跑，报告 PASS/FAIL |
 | [ask-chatgpt-pro](skills/ask-chatgpt-pro/) | 在 ChatGPT 浏览器界面咨询 GPT Pro 模型，用于重要规格、架构/迁移决策、对比、带来源的研究或批判性评审，并在本地验证适配 |
@@ -66,6 +70,8 @@ npx skills add zytakeshi/admin-skills@loop-builder
 | [ask-grok](skills/ask-grok/) | 用官方 Grok CLI（订阅 OAuth，无需 API key）向 Grok（xAI）查询实时 Web 和 X/Twitter 信息 — 最新发布、突发新闻、社区风向，回答连同来源链接原样展示 |
 | [cdp-chrome](skills/cdp-chrome/) | 在 Chrome 136+ 上让 Chrome DevTools（CDP）自动化无人值守运行 — 用 `--browserUrl` 连接专用的已登录 Chrome，从此不再弹「Allow remote debugging?」授权框；附 `cdp-chrome` 脚本（start / reseed / status / config）。仅 macOS |
 | [loop-builder](skills/loop-builder/) | 设计、构建、测试、观察运行并安全启用无人值守自动化循环（cron / launchd / systemd timer / 定时 agent / 守护进程）— 执行体/调度器选型、安全契约、dry-run 优先、回滚准备、证据门观察运行、可审计的 arm 事务 |
+| [verify](skills/verify/) | 提交前用真实程序验证：按 diff 选检查、外部通过信号、坏构建必须失败、`Verified:` 尾注；自动生成项目 verify skill |
+| [chief](skills/chief/) | 以幕僚长的方式运行大型多会话工作:分配任务、严守关卡、管理设备、磁盘和额度 |
 
 ## 使用方法
 
@@ -85,6 +91,7 @@ npx skills add zytakeshi/admin-skills@loop-builder
 - `/ask-grok` — 从 Grok 获取实时 Web / X 信息，连同来源原样展示
 - `/cdp-chrome` — 配置无人值守的 Chrome DevTools 自动化（专用已登录 Chrome，无授权弹窗）
 - `/loop-builder` — 设计、加固并安全启用一个定时自动化循环
+- `/verify` — 验证改动可用并记录验证方式
 
 ## 相关项目
 

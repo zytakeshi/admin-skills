@@ -19,8 +19,11 @@ instead of guessing or hedging about a cutoff.
 Always go through the bundled wrapper — it handles the two failure modes that
 otherwise make raw calls flaky (see "Why the wrapper", below):
 
+Run the examples below from this skill's directory (the directory containing
+this `SKILL.md`):
+
 ```bash
-~/.claude/skills/ask-grok/scripts/ask_grok.sh "PROMPT"
+./scripts/ask_grok.sh "PROMPT"
 ```
 
 Leave the model unset. The script falls through to the Grok CLI's own default,
@@ -28,8 +31,8 @@ which is the current web + X search family. Only pass a second argument when the
 user names an exact model in that message — never pin a slug here, it goes stale:
 
 ```bash
-~/.claude/skills/ask-grok/scripts/ask_grok.sh "PROMPT"            # normal
-~/.claude/skills/ask-grok/scripts/ask_grok.sh "PROMPT" <model>    # only if asked
+./scripts/ask_grok.sh "PROMPT"            # normal
+./scripts/ask_grok.sh "PROMPT" <model>    # only if asked
 ```
 
 The script prints to stdout and exits 0; on failure it exits 1 with a diagnostic
@@ -41,9 +44,9 @@ Read `.text` for the answer to present. If you'd rather get the bare answer text
 (no JSON envelope), set `GROK_FORMAT=plain`:
 
 ```bash
-GROK_FORMAT=plain ~/.claude/skills/ask-grok/scripts/ask_grok.sh "PROMPT"
+GROK_FORMAT=plain ./scripts/ask_grok.sh "PROMPT"
 # pipe the JSON default through jq when you want just the text:
-~/.claude/skills/ask-grok/scripts/ask_grok.sh "PROMPT" | jq -r .text
+./scripts/ask_grok.sh "PROMPT" | jq -r .text
 ```
 
 **Default behavior:** the wrapper automatically appends a standing instruction
@@ -53,7 +56,7 @@ out every call. To send your prompt *exactly* as written (no appended
 instruction), set `GROK_RAW=1`:
 
 ```bash
-GROK_RAW=1 ~/.claude/skills/ask-grok/scripts/ask_grok.sh "PROMPT"
+GROK_RAW=1 ./scripts/ask_grok.sh "PROMPT"
 ```
 
 ## Writing the prompt you send to Grok
@@ -72,7 +75,7 @@ Grok is a separate agent with no view of this conversation, so make the prompt
 Example:
 
 ```bash
-~/.claude/skills/ask-grok/scripts/ask_grok.sh \
+./scripts/ask_grok.sh \
   "Search the web and X for the latest stable release of Bun (the JS runtime) as of today. Give the version number, release date, and a source URL. Under 4 lines."
 ```
 

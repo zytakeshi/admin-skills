@@ -8,11 +8,11 @@ A collection of sysadmin and DevOps skills for Claude Code. Automate deployments
 
 ## Why Use These Skills?
 
-- **`/deploy`** — Zero-downtime deployments with mandatory backups, drift detection, and automatic cache clearing. Never forget a rollback plan again.
+- **`/deploy`** — SSH/SCP deployments with mandatory backups, drift detection, stack-specific cache handling, and smoke tests. Downtime depends on the application and deployment method.
 - **`/commit-push`** — Analyzes your diffs, generates conventional commit messages, and safely pushes. No more "fix stuff" commits.
 - **`/create-pr`** — Creates a PR and automatically gets it reviewed by [OpenAI Codex](https://chatgpt.com/codex). When the review completes, Claude reads the feedback, fixes the issues it agrees with, pushes the fixes, and asks you to merge — fully automated end-to-end.
-- **`/html`** — Produces a single self-contained animated `.html` page (dark scrollytelling, CJK-safe, zero dependencies) that explains a concept, system, dataset, or product.
-- **`/codex`** — Bridge to the OpenAI Codex CLI for code review, design consultation, bug investigation, security audits, and second opinions. Streams events as they arrive, captures the final answer to a per-invocation result file, and surfaces cross-cutting integration findings beyond the diff.
+- **`/html`** — Produces a single animated `.html` explainer with automatic light/dark appearance and English, Simplified Chinese, and Japanese content. Zero external dependencies by default; optional CDN libraries require a pinned version and a fallback.
+- **`/codex`** — Bridge to the OpenAI Codex CLI for code review, design consultation, bug investigation, security audits, and second opinions. By default, the guard captures events to a file and reports milestones and final status; live event streaming is opt-in. It saves the final answer to a per-invocation result file and surfaces cross-cutting integration findings beyond the diff.
 - **`/codexloop`** — Iterative review-and-fix loop with Codex. Codex reviews, Claude fixes the findings it agrees with, repeat until clean (or both sides reach an honest impasse). No fixed iteration cap.
 - **`/codex-test`** — Offload a headless/unattended browser smoke or e2e test to the Codex CLI. It drives an isolated Playwright browser (or attaches to a logged-in Chrome session when one's required), may fix code and re-run until the flow passes, streams progress, and reports a PASS/FAIL verdict plus any changes it made.
 - **`/ask-chatgpt-pro`** — Ask the strongest available GPT Pro model in the ChatGPT browser UI for high-stakes specs, architecture or migration decisions, comparisons, source-backed research, or critique — then verify and adapt the answer locally.
@@ -22,6 +22,8 @@ A collection of sysadmin and DevOps skills for Claude Code. Automate deployments
 - **`/ask-grok`** — Consult Grok (xAI) for real-time web and X/Twitter knowledge using your existing X Premium / SuperGrok subscription (no API key). Routes "what's the latest on…", breaking news, newest tool versions, and "what are people saying on X about…" to Grok via the official Grok CLI, then shows the answer verbatim with its source links.
 - **`/cdp-chrome`** — Run Chrome DevTools (CDP) browser automation **unattended** on Chrome 136+ by attaching to a dedicated, already-logged-in Chrome instance via `--browserUrl` — so the native "Allow remote debugging?" consent dialog never appears and `chrome-devtools-mcp` / Puppeteer / Playwright stop hanging on connect. Bundles a `cdp-chrome` helper (start / reseed / status / config). macOS.
 - **`/loop-builder`** — Guides you (or Claude) from "turn this into a recurring job" to a properly hardened unattended loop: pick the right worker (script vs. agent) and supervisor (cron / launchd / systemd timer / scheduled agent), write a loop spec with a security contract, implement dry-run-first with locking, idempotency, and observability, prepare rollback before enabling, soak behind pre-registered evidence gates, and arm mutating loops through an auditable transaction with human authority for high-risk automation. Quiet by default — pages only on actionable failures.
+- **`/verify`** — Prove a change works by running the real thing before commit: picks checks from the diff, takes the pass signal from outside the code (OS, HTTP, DB), proves each check can fail, and ends with a `Verified:` commit trailer. In a repo without its own verify skill, it writes one from the steps that worked.
+- **`/chief`** — Act as your chief of staff on a large multi-session effort: it drives many Orca sessions, routes work to Codex and Cursor, keeps test gates honest, and manages devices, disks and limits, so that you stay out of the loop.
 
 ## Install
 
@@ -46,6 +48,8 @@ npx skills add zytakeshi/admin-skills@finish-translation
 npx skills add zytakeshi/admin-skills@ask-grok
 npx skills add zytakeshi/admin-skills@cdp-chrome
 npx skills add zytakeshi/admin-skills@loop-builder
+npx skills add zytakeshi/admin-skills@verify
+npx skills add zytakeshi/admin-skills@chief
 ```
 
 ## Available Skills
@@ -55,8 +59,8 @@ npx skills add zytakeshi/admin-skills@loop-builder
 | [deploy](skills/deploy/) | Deploy files to remote servers via SSH/SCP with mandatory backup, drift detection, cache clearing, and smoke testing |
 | [commit-push](skills/commit-push/) | Analyze changes, generate a commit message, stage, commit, and push in one step |
 | [create-pr](skills/create-pr/) | Full PR lifecycle: commit, push, create PR, wait for Codex review, fix issues, and merge |
-| [html](skills/html/) | Build a single self-contained animated HTML explainer — scrollytelling, CJK-safe, zero dependencies |
-| [codex](skills/codex/) | Bridge to OpenAI Codex CLI for code review, design consultation, security audits, and second opinions — with streaming progress |
+| [html](skills/html/) | Build a single animated HTML explainer — automatic light/dark appearance, EN/ZH/JA content, zero external dependencies by default |
+| [codex](skills/codex/) | Bridge to OpenAI Codex CLI for code review, design consultation, security audits, and second opinions — with captured events and opt-in live progress |
 | [codexloop](skills/codexloop/) | Iterative review-and-fix loop with Codex: review → fix → re-review until clean or honest impasse |
 | [codex-test](skills/codex-test/) | Offload a headless/unattended browser smoke or e2e test to the Codex CLI — Playwright-first (isolated browser), may fix code and re-run, reports PASS/FAIL |
 | [ask-chatgpt-pro](skills/ask-chatgpt-pro/) | Consult the GPT Pro model in the ChatGPT browser UI for important specs, architecture/migration decisions, comparisons, source-backed research, or critique — then verify and adapt locally |
@@ -66,6 +70,8 @@ npx skills add zytakeshi/admin-skills@loop-builder
 | [ask-grok](skills/ask-grok/) | Consult Grok (xAI) for real-time web + X/Twitter knowledge via the official Grok CLI (subscription OAuth, no API key) — latest releases, breaking news, social pulse, answers shown verbatim with source links |
 | [cdp-chrome](skills/cdp-chrome/) | Run Chrome DevTools (CDP) automation unattended on Chrome 136+ — attach to a dedicated, logged-in Chrome via `--browserUrl` so the "Allow remote debugging?" dialog never appears; bundles a `cdp-chrome` helper (start / reseed / status / config). macOS |
 | [loop-builder](skills/loop-builder/) | Design, build, test, soak, and safely arm unattended automation loops (cron / launchd / systemd timers / scheduled agents / daemons) — worker/supervisor selection, security contract, dry-run-first, rollback prep, evidence-gated soak, auditable arm transaction |
+| [verify](skills/verify/) | Run the real thing before commit: diff-picked checks, outside pass signals, a check must fail on a broken build, `Verified:` trailer; scaffolds a project verify skill |
+| [chief](skills/chief/) | Run a large multi-session effort as your chief of staff: route work, keep gates honest, manage devices, disks and limits |
 
 ## Usage
 
@@ -85,6 +91,7 @@ After installing, use the skills in Claude Code:
 - `/ask-grok` — get live web / X answers from Grok, shown verbatim with sources
 - `/cdp-chrome` — set up unattended Chrome DevTools automation (dedicated logged-in Chrome, no permission dialog)
 - `/loop-builder` — design, harden, and safely arm a recurring automation loop
+- `/verify` — prove a change works and record how
 
 ## See Also
 

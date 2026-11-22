@@ -59,8 +59,10 @@ The user can still name a lane or a model and effort ("/codex with codex", "/cur
 
 After constructing the codex command in Step 3 (points 1–4: prompt, probes, `TASK_ID`), launch it wrapped in the guard, with `run_in_background: true`:
 
+Run this command from the directory containing this `SKILL.md`:
+
 ```bash
-bash ~/.claude/skills/codex/scripts/codex-guard.sh <TASK_ID> 1800 -- \
+bash ./scripts/codex-guard.sh <TASK_ID> 1800 -- \
   codex exec --json --sandbox <read-only|workspace-write> --skip-git-repo-check \
   --cd <project_directory> -o /tmp/codex_result_<TASK_ID>.txt "<constructed_prompt>"
 ```
